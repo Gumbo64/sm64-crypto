@@ -1,0 +1,12 @@
+[package]
+name = "main_program"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ctrlc = "3.4.7"
+iroh = "0.91.2"
+iroh-blobs = "0.93.0"
+iroh-gossip = "0.91.0"
+libloading = "0.8.7"
+rand = "0.9.1"

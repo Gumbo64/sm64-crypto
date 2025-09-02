@@ -1,0 +1,33 @@
+# Main Makefile
+
+SM64ENV = sm64game
+SM64PC = $(SM64ENV)/sm64-port
+
+ROM_FILE = baserom.us.z64
+
+
+# Define the target that will copy the ROM file and call the Makefile in SM64PC
+all: copy-rom
+	@echo "Calling Makefile in $(SM64PC)..."
+	$(MAKE) -C $(SM64PC) -j
+	$(MAKE) -C $(SM64PC) -j HEADLESS_VERSION=1
+
+	cp $(SM64PC)/build/us_pc_headless/sm64.us rust_crypto/sm64_headless.us
+	cp $(SM64PC)/build/us_pc/sm64.us rust_crypto/sm64.us
+
+# Define a target to copy the ROM file into the SM64PC
+copy-rom:
+	@echo "Copying $(ROM_FILE) to $(SM64PC)..."
+	@if [ ! -f $(ROM_FILE) ]; then \
+		echo -e "\033[0;31mA Mario 64 ROM is required with the name $(ROM_FILE)\033[0m"; \
+		exit 1; \
+	fi
+	
+	cp $(ROM_FILE) $(SM64PC)/$(ROM_FILE)
+
+
+clean:
+	@echo "Cleaning up..."
+	$(MAKE) -C $(SM64PC) clean
+
+.PHONY: all copy-rom clean

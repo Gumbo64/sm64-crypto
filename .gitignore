@@ -1,0 +1,14 @@
+baserom.us.z64
+sm64.us
+sm64_headless.us
+*.tmp.so
+target/
+__pycache__
+.venv
+.vscode
+build/
+dist/
+tmp_so/
+
+sm64game/sm64env/build
+rust_crypto/sm64_headless.us
