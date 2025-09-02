@@ -3,6 +3,9 @@ use sm64_so::{SM64Game, eval_metric, StatefulInputGenerator, Replay};
 use std::time::Instant;
 use std::time::Duration;
 
+use std::env;
+use std::io::{self, Read, Write};
+
 pub fn evaluate_replay(seed: &str, solution_bytes: Vec<u8>, fps: u32) -> bool {
     let step_time = if fps > 0 { Duration::from_secs_f64(1.0 / fps as f64) } else { Duration::from_secs(0) };
     let headless = fps == 0;
@@ -16,7 +19,7 @@ pub fn evaluate_replay(seed: &str, solution_bytes: Vec<u8>, fps: u32) -> bool {
 
     let replay = Replay::new(solution_bytes, false);
 
-    let mut last_time = Instant::now();
+    let mut last_time: Instant = Instant::now();
 
     for (button, stick_x, stick_y) in replay {
         if !input_gen.validate_action(&sm64_game, button, stick_x, stick_y) {
@@ -47,8 +50,7 @@ pub fn evaluate_replay(seed: &str, solution_bytes: Vec<u8>, fps: u32) -> bool {
     won
 }
 
-use std::env;
-use std::io::{self, Read};
+
 
 fn main() {
     // Collect command-line arguments
@@ -61,11 +63,13 @@ fn main() {
     }
     
     // The first argument is the program name, the second is the input data
-    let seed: &str = &args[1];
+    let seed: &String = &args[1];
     let fps: u32 = args[2].parse().expect("Failed to convert fps to u32");
 
     let mut solution_bytes: Vec<u8> = Vec::new();
     io::stdin().read_to_end(&mut solution_bytes).expect("Failed to read data");
-    
-    println!("{}", evaluate_replay(seed, solution_bytes, fps)); // "returns" true or false
+
+    let result = evaluate_replay(&seed, solution_bytes, fps); // "returns" true or false
+    let mut stdout = io::stdout();
+    stdout.write_all(result.to_string().as_bytes()).expect("Failed to write to stdout");
 }

@@ -1,7 +1,11 @@
-use sm64_so::{SM64Game, eval_metric, StatefulInputGenerator, Replay};
+use sm64_so::{buttons_to_int, eval_metric, Replay, SM64Game, StatefulInputGenerator};
 
 use device_query::{DeviceQuery, DeviceState, Keycode};
-use std::io::{self, Write};
+use std::io::{self, Write, Read};
+use std::time::Instant;
+use std::time::Duration;
+
+use std::env;
 
 struct Config {
     speed: f32,
@@ -23,16 +27,32 @@ fn get_inputs(held_keys: &Vec<Keycode>) -> (u16, i8, i8) {
     } else if held_keys.contains(&Keycode::S) {
         stick_y = -80;
     }
-    let button = (held_keys.contains(&Keycode::I) as u16) << 0
-        | (held_keys.contains(&Keycode::J) as u16) << 1
-        | (held_keys.contains(&Keycode::O) as u16) << 2
-        | (held_keys.contains(&Keycode::Enter) as u16) << 3;
+
+    let button = buttons_to_int(
+        held_keys.contains(&Keycode::I),
+        held_keys.contains(&Keycode::J),
+        false,
+        false,
+        held_keys.contains(&Keycode::O),
+        held_keys.contains(&Keycode::Enter),
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+    );
+
     (button, stick_x, stick_y)
 }
 
 fn set_config(held_keys: Vec<Keycode>, config: &mut Config) {
     if held_keys.contains(&Keycode::Space) {
         config.speed = if held_keys.contains(&Keycode::LShift) { 10.0 } else { 0.1 };
+    } else {
+        config.speed = 1.0;
     }
     if held_keys.contains(&Keycode::Q) {
         config.reset = true;
@@ -72,7 +92,10 @@ pub fn record_replay(seed: &str, starting_bytes: Vec<u8>) -> (Vec<u8>, bool) {
         goback: false
     };
     let ds = DeviceState::new();
+    let mut last_time: Instant = Instant::now();
+    
     loop {
+        
         let held_keys = ds.get_keys();
 
         let (mut b, mut x, mut y) = get_inputs(&held_keys);
@@ -108,14 +131,16 @@ pub fn record_replay(seed: &str, starting_bytes: Vec<u8>) -> (Vec<u8>, bool) {
             solution_bytes = Vec::new();
             break;
         }
+        let elapsed = last_time.elapsed();
+        let dur = Duration::from_secs_f64(1.0 / (30.0 * config.speed) as f64);
+        if elapsed < dur {
+            std::thread::sleep(dur - elapsed);
+        }
+        last_time = Instant::now();
     }
 
     (solution_bytes, won)
 }
-
-
-use std::env;
-use std::io::{Read};
 
 fn main() {
     // Collect command-line arguments

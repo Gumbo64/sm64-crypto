@@ -25,7 +25,6 @@ copy-rom:
 	
 	cp $(ROM_FILE) $(SM64PC)/$(ROM_FILE)
 
-
 clean:
 	@echo "Cleaning up..."
 	$(MAKE) -C $(SM64PC) clean

@@ -151,7 +151,7 @@ impl StatefulInputGenerator {
         Self { 
             rng, 
             rng_window_length_max: 100,
-            rng_random_action_max: 20,
+            rng_random_action_max: 5,
 
             rng_window_cur_amount: 0,
             rng_random_action_amount: 0
@@ -160,10 +160,11 @@ impl StatefulInputGenerator {
     }
     pub fn validate_action(&mut self, game: &SM64Game, button: u16, stick_x: i8, stick_y: i8) -> bool {
         let (action, random) = self.get_iter(game);
-        let (b, x, y) = action;
         if !random {
-            return false;
+            return true;
         }
+        let (b, x, y) = action;
+
         b == button && x == stick_x && y == stick_y
     }
 

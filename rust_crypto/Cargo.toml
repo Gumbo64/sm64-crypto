@@ -2,8 +2,9 @@
 members = [
     "main",
     "sm64/evaluate",
-    "sm64/record"
-, "sm64/sm64_so"]
+    "sm64/record", 
+    "sm64/sm64_so"
+]
 resolver = "3"
 
 default-run = "main"

@@ -2038,7 +2038,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "main_program"
+name = "main"
 version = "0.1.0"
 dependencies = [
  "ctrlc",

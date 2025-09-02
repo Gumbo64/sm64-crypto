@@ -1,5 +1,5 @@
 [package]
-name = "main_program"
+name = "main"
 version = "0.1.0"
 edition = "2024"
 
