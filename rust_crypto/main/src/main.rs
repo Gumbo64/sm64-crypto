@@ -2,29 +2,26 @@
 use std::process::Command;
 use std::env;
 
-fn main() {
+
+
+fn ez_record(seed: &str) -> Vec<u8> {
     // Locate sibling binaries (built in the same target dir as this binary)
     let exe_path = env::current_exe().expect("Failed to get current executable path");
     let current_directory = exe_path.parent().expect("Failed to get parent directory");
     let record_command_path = current_directory.join("record");
-    let evaluate_command_path = current_directory.join("evaluate");
 
-    // Seed controlling deterministic game/replay generation
-    let seed = "my_seed";
-
-    // Run the `record` helper to produce a replay; capture its stdout bytes
     let output = Command::new(record_command_path)
-        .arg(seed) // pass the same seed to `record`
-        .output() // run and collect stdout/stderr
+        .arg(seed)
+        .output()
         .expect("Failed to execute command");
 
-    // Extract the replay/m64 payload from `record`'s stdout
-    let solution_bytes = output.stdout.clone();
+    output.stdout.clone()
+}
 
-    // Target FPS for evaluation (affects simulation timing)
-    // let fps = 30;
-    let fps = 0;
-
+fn ez_evaluate(seed: &str, solution_bytes: Vec<u8>, fps: i8) -> bool {
+    let exe_path = env::current_exe().expect("Failed to get current executable path");
+    let current_directory = exe_path.parent().expect("Failed to get parent directory");
+    let evaluate_command_path = current_directory.join("evaluate");
 
     // Spawn `evaluate`, pass seed and fps as args, and stream replay bytes via stdin
     let output = Command::new(evaluate_command_path)
@@ -45,13 +42,18 @@ fn main() {
             .expect("Failed to execute command");
 
     let success: bool = &output.stdout == &"true".as_bytes().to_vec();
+    success
+}
+
+fn main() {
+    let seed = "yeah cuz";
+
+    let solution_bytes = ez_record(seed);
+    let success = ez_evaluate(seed, solution_bytes, 0);
 
     if success {
         println!("Hooray! it works");
     } else {
         println!("It failed bro its over");
-    }
-    
-            
-    
+    }    
 }
