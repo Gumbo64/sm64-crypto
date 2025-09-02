@@ -4,7 +4,6 @@ use device_query::{DeviceQuery, DeviceState, Keycode};
 use std::io::{self, Write, Read};
 use std::time::Instant;
 use std::time::Duration;
-
 use std::env;
 
 struct Config {
@@ -73,6 +72,7 @@ pub fn record_replay(seed: &str, starting_bytes: Vec<u8>) -> (Vec<u8>, bool) {
     let replay = Replay::new(starting_bytes, false);
 
     for (button, stick_x, stick_y) in replay {
+        // println!("{} {} {}", button, stick_x, stick_y);
         if !input_gen.validate_action(&sm64_game, button, stick_x, stick_y) {
             println!("Invalid input detected: {}, {}, {}", button, stick_x, stick_y);
             break;
@@ -123,7 +123,8 @@ pub fn record_replay(seed: &str, starting_bytes: Vec<u8>) -> (Vec<u8>, bool) {
         }
 
         if config.goback {
-            solution_bytes.truncate(solution_bytes.len() - 4 * config.goback_amount);
+            let new_length = solution_bytes.len().saturating_sub(4 * config.goback_amount);
+            solution_bytes.truncate(new_length);
             break;
         }
 
@@ -157,11 +158,10 @@ fn main() {
     let mut starting_bytes: Vec<u8> = Vec::new();
     io::stdin().read_to_end(&mut starting_bytes).expect("Failed to read data");
 
-
-    let (solution_bytes, won) = record_replay(seed, starting_bytes);
-    if !won {
-        return;
-    }
+    let (solution_bytes, _won) = record_replay(seed, starting_bytes);
+    // if !won {
+    //     return;
+    // }
 
     let mut stdout = io::stdout();
     stdout.write_all(solution_bytes.as_slice()).expect("Failed to write to stdout");
