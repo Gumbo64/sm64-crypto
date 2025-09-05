@@ -1,33 +1,33 @@
-use core::hash;
 use std::{
-    clone, collections::HashMap, fmt, hash::Hasher, net::{Ipv4Addr, SocketAddrV4}, result, str::FromStr, u128
+    fmt, str::FromStr, u128
 };
 
-use anyhow::Context;
 use bytes::Bytes;
 use clap::Parser;
-use ed25519_dalek::Signature;
 use futures_lite::StreamExt;
-use iroh::{Endpoint, NodeAddr, PublicKey, RelayMode, RelayUrl, SecretKey, Watcher};
+use iroh::{Endpoint, NodeAddr, PublicKey, RelayMode, Watcher };
 use iroh_gossip::{
-    api::{Event, GossipReceiver},
-    net::{Gossip},
+    api::{Event, GossipReceiver, GossipSender},
+    net::Gossip,
     proto::TopicId,
 };
+use log::info;
 use n0_future::task;
-use n0_snafu::{Result, ResultExt};
+use n0_snafu::{Result, ResultExt, Error};
 use serde::{Deserialize, Serialize};
+
 use snafu::whatever;
+use tokio::sync::Mutex;
+use std::sync::Arc;
 
 mod use_exes;
-use rand::{rand_core::block, Rng};
+
 use use_exes::{ez_record_loop, ez_evaluate};
 use sha2::{Sha256, Digest};
 
-use std::sync::{Arc, Mutex};
-use tracing::info;
 
-use iroh_blobs::{api::{blobs::Blobs, downloader::Downloader, Store}, get::request::GetBlobItem, store::mem::MemStore, ticket::BlobTicket, BlobFormat, BlobsProtocol, Hash};
+use iroh_blobs::{api::{ downloader::{Downloader, Shuffled}, tags::Tags }, store::mem::MemStore, store::fs::FsStore, BlobsProtocol, Hash };
+
 use iroh::protocol::Router;
 // use iroh_docs::{protocol::Docs};
 
@@ -58,249 +58,277 @@ enum Command {
     },
 }
 
-#[derive(Clone)]
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct BlockHead {
     hash: Hash,
-    block_height: u128,
+    height: u128,
+}
+impl BlockHead {
+    fn no_blocks(&self) -> bool {
+        let def = BlockHead::default();
+        self.hash == def.hash && self.height == def.height
+    }
+
+    fn encode(&self) -> Result<Bytes> {
+        Ok(postcard::to_stdvec(&self).e().expect("Failed to encode block").into())
+    }
+
+    pub fn decode(bytes: &[u8]) -> Result<BlockHead> {
+        Ok(postcard::from_bytes(bytes).e()?)
+    }
+    
+}
+impl Default for BlockHead {
+    fn default() -> Self {
+        BlockHead {
+            hash: Hash::EMPTY,
+            height: u128::MAX,
+        }
+    }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
-    let args = Args::parse();
+#[derive(Debug, Clone)]
+struct BlockChain {
+    // head_hash: Hash,
+    // head_height: u128,
+    blobs: BlobsProtocol,
+    tags: Tags,
+    downloader: Downloader,
+    sender: GossipSender,
+    peers_lock: Arc<Mutex<Vec<PublicKey>>>,
+    // receiver: GossipReceiver,
+}
 
-    // parse the cli command
-    let (topic, peers) = match &args.command {
-        Command::Open{} => {
-            let topic = TopicId::from_bytes(rand::random());
-            // println!("> opening chat room for topic {topic}");
-            (topic, vec![])
-        }
-        Command::Join { ticket } => {
-            let Ticket { topic, peers } = Ticket::from_str(ticket)?;
-            // println!("> joining chat room for topic {topic}");
-            (topic, peers)
-        }
-    };
+impl BlockChain {
+    pub async fn new(endpoint: Endpoint, ticket: Option<Ticket>) -> Option<(BlockChain, GossipReceiver)> {
+        // Create protocols
 
-
-    // configure our relay map
-    let relay_mode = RelayMode::Default;
-    // println!("> using relay servers: {}", fmt_relay_mode(&relay_mode));
-
-    // build our magic endpoint
-    let endpoint = Endpoint::builder()
-        .relay_mode(relay_mode)
-        // .bind_addr_v4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, args.bind_port))
-        .bind()
-        .await?;
-    // println!("> our node id: {}", endpoint.node_id());
+        let is_hosting = ticket.is_none();
 
 
-    // create a protocol handler using an in-memory blob store.
-    let store = MemStore::new();
+        let store_path = format!("my_blockchain_{}", is_hosting);
+        let store = FsStore::load(store_path).await.expect("failed to load fs");
 
-    let blobs = BlobsProtocol::new(&store, endpoint.clone(), None);
-    // create the gossip protocol
-    let gossip = Gossip::builder().spawn(endpoint.clone());
+        // let store = MemStore::new();
+        let blobs = BlobsProtocol::new(&store, endpoint.clone(), None);
+        let gossip = Gossip::builder().spawn(endpoint.clone());
+        let tags = blobs.tags();
+        let downloader = store.downloader(&endpoint);
 
-    // let docs = Docs::memory()
-    //     .spawn(endpoint.clone(), (*blobs).clone(), gossip.clone());
+        // Setup router
+        let _router = Router::builder(endpoint.clone())
+            .accept(iroh_blobs::ALPN, blobs.clone())
+            .accept(iroh_gossip::ALPN, gossip.clone())
+            .spawn();
 
-    // print a ticket that includes our own node id and endpoint addresses
-    let ticket = {
-        let me = endpoint.node_addr().initialized().await;
-        let peers = peers.iter().cloned().chain([me]).collect();
-        Ticket { topic, peers }
-    };
-    println!("> ticket to join us: {ticket}");
-
-    // setup router
-    let router = Router::builder(endpoint.clone())
-        .accept(iroh_blobs::ALPN, blobs.clone())
-        .accept(iroh_gossip::ALPN, gossip.clone())
-        // .accept(iroh_docs::ALPN, docs.clone())
-        .spawn();
-
-    // join the gossip topic by connecting to known peers, if any
-    let peer_ids = peers.iter().map(|p| p.node_id).collect();
-    if peers.is_empty() {
-        // println!("> waiting for peers to join us...");
-    } else {
-        // println!("> trying to connect to {} peers...", peers.len());
-        // add the peer addrs from the ticket to our endpoint's addressbook so that they can be dialed
-        for peer in peers.into_iter() {
-            endpoint.add_node_addr(peer)?;
-        }
-    };
-    let (sender, receiver) = gossip.subscribe(topic, peer_ids).await?.split();
-    // println!("> connected!");
-
-
-
-    // subscribe and print loop
-    let mut local_head = BlockHead { hash: Hash::EMPTY, block_height: u128::MAX };
-    let head_lock: Arc<Mutex<BlockHead>> = Arc::new(Mutex::new(local_head.clone()));
-
-    let downloader = store.downloader(&endpoint);
-    task::spawn(subscribe_loop(downloader, blobs.clone(), receiver, Arc::clone(&head_lock)));
-
-
-
-    while args.record {
-    // loop {
-        if let Ok(bh) = head_lock.lock() {
-            local_head = bh.clone();
-        } else {
-            continue;
+        // Absorb ticket
+        let mut topic = TopicId::from_bytes(rand::random());
+        let mut peers = vec![];
+        if let Some(t) = ticket {
+           topic = t.topic;
+           peers = t.peers;
         }
 
-        let block_opt = Block::new(&local_head);
-        if let Some(block) = block_opt {
-            let hash = blobs.add_bytes(block.encode()?).await?.hash;
-            let node_addr = endpoint.node_addr().initialized().await;
-            let ticket = BlobTicket::new(node_addr, hash, BlobFormat::Raw);
-            
-            let message = Message::NewBlockHead { link: ticket };
-            
-            let encoded_message = SignedMessage::sign_and_encode(endpoint.secret_key(), &message)?;
-            sender.broadcast(encoded_message).await?;
-            println!("> sent: {}", local_head.block_height);
+        // Join peers
+        let peer_ids = peers.iter().map(|p| p.node_id).collect();
+        for peer in peers.clone().into_iter() {
+            endpoint.add_node_addr(peer).ok();
+        }
 
-            loop {
-                if let Ok(mut bh) = head_lock.lock() {
-                    bh.hash = hash;
-                    bh.block_height = block.block_height;
-                    println!("{} {}", bh.block_height, bh.hash);
+        // Join/create gossip chat
+        let (sender, receiver) = gossip.subscribe(topic, peer_ids).await.ok()?.split();
+
+        // Print new ticket including us
+        let ticket_with_me: Ticket = {
+            let me = endpoint.node_addr().initialized().await;
+            let peers = peers.iter().cloned().chain([me]).collect();
+            Ticket { topic, peers }
+        };
+        println!("> ticket to join us: {ticket_with_me}");
+
+        let peers_lock = Arc::new(Mutex::new(receiver.neighbors().collect()));
+
+        Some((BlockChain { blobs: blobs.clone(), tags: tags.clone(), downloader, sender, peers_lock }, receiver))
+    }
+
+    async fn get_head(&self) -> Result<BlockHead> {
+        let ott = self.tags.get(String::from("head")).await;
+        
+        match ott {
+            Ok(ot) => {
+                let t = ot.e()?;
+                let bytes = self.blobs.get_bytes(t.hash).await?;
+                return BlockHead::decode(&bytes);
+            }
+            Err(e) => {
+                println!("{}",e);
+                self.set_head(BlockHead::default()).await?;
+                return Ok(BlockHead::default());
+            }
+        }
+
+    }
+    async fn set_head(&self, head: BlockHead) -> Result<()> {
+        let h= self.blobs.add_bytes( postcard::to_stdvec(&head).e()?).await?.hash;
+        self.tags.set( String::from("head"), h).await?;
+        Ok(())
+    }
+
+    async fn get_block(&self, hash: Hash) -> Result<Block> {
+        let block_bytes: Bytes = match self.blobs.get_bytes(hash).await {
+            Ok(b) => b, // We have it locally
+            Err(_e) => { // Try to get it from peers
+                let peers = Shuffled::new(self.peers_lock.lock().await.to_vec());
+                let mut progress = self.downloader.download(hash, peers)
+                    .stream().await.e()?;
+                while let Some(event) = progress.next().await {
+                    info!("Progress: {:?}", event);
+                }
+                self.blobs.get_bytes(hash).await?
+            }
+        };
+        Ok(Block::decode(&block_bytes)?)
+    }
+
+    async fn hash_at_height(&self, height: u128) -> Option<Hash>{
+        Some(self.tags.get(height.to_string()).await.ok()??.hash)
+    }
+
+    async fn add_block_blob(&self, block: Block) -> Result<Hash> {
+        let encoding = block.encode().e()?;
+        let hash = self.blobs.add_bytes(encoding).await.e()?.hash;
+        Ok(hash)
+    }
+
+    async fn temp_add_block(&self, hash: Hash) -> Result<()> {
+        let block = self.get_block(hash).await.e()?;
+        self.tags.set( String::from("temp_") + &block.block_height.to_string(), hash).await?;
+        Ok(())
+    }
+
+    async fn clear_temp_blocks(&self) -> Result<()> {
+        self.tags.delete_prefix(String::from("temp_")).await.e()?;
+        Ok(())
+    }
+
+    async fn confirm_block(&self, height: u128) -> Result<()> {
+        self.tags.rename(String::from("temp_") + &height.to_string(), height.to_string()).await?;
+        Ok(())
+    }
+
+    async fn new_block(&self, new_head_hash: Hash) -> Result<()> {
+
+        let new_head = self.get_block(new_head_hash).await.e()?;
+
+        // check that the new head is even worth it, it should have a higher head
+        let head = self.get_head().await.expect("Failed to get head");
+        if !head.no_blocks() && (new_head.block_height <= head.height) {
+            whatever!("New head is worse than the old one");
+        }
+
+        // Loop from the head downwards, validating all those blocks
+        let mut cur_hash = new_head_hash.clone();
+        let mut cur_height = new_head.block_height.clone();
+        let mut block = new_head.clone();
+        loop {
+
+            if let Some(h) = self.hash_at_height(cur_height).await {
+                if h == cur_hash {
+                    // We already have this block in our chain, so we can stop
                     break;
                 }
             }
+            block = self.get_block(cur_hash).await.e()?;
 
-        } else {
-            // println!("Some fail");
+            if cur_height != block.block_height {
+                whatever!("Non sequential blocks");
+            }
+            if cur_height == 0 && block.prev_hash != Hash::EMPTY {
+                whatever!("Failed genesis block");
+            }
+
+            // Test if it works
+            if !block.evaluate_replay().await {
+                whatever!("Replay fail");
+            }
+
+            // Add this block to the temporary storage
+            self.temp_add_block(cur_hash).await?;
+
+            // We have reached the genesis block
+            if cur_height == 0 {
+                break;
+            }
+            cur_hash = block.prev_hash;
+            cur_height -= 1;
         }
 
+        // Once all blocks are validated and stored in the temporary area, update it to be our new blockchain
+        for i in (block.block_height)..(new_head.block_height) {
+            println!("Confirming {i}");
+            self.confirm_block(i).await?;
+        }
+
+        let new_blockhead = BlockHead {hash: new_head_hash, height: new_head.block_height };
+        self.set_head(new_blockhead).await.e()?;
+        self.clear_temp_blocks().await?;
+
+
+        println!("L");
+        self.broadcast_block(new_head_hash).await.e()?;
+
+        Ok(())
     }
 
-    
-    let _ = tokio::signal::ctrl_c().await;
+    async fn broadcast_block(&self, hash: Hash) -> Result<()> {
+        let message = Message::NewBlockHead { hash };
+        let encoded = message.encode().e()?;
+        self.sender.broadcast_neighbors(encoded).await.e()?;
+        Ok(())
+    }
 
-
-    // shutdown
-    router.shutdown().await.e()?;
-
-    Ok(())
+    async fn broadcast_head(&self) -> Result<()> {
+        let head = self.get_head().await.e()?;
+        if head.no_blocks(){
+            return Ok(());
+        }
+        self.broadcast_block(head.hash).await
+    }
 }
-
-// fn get_block()
-
-async fn subscribe_loop(downloader: Downloader, blobs: BlobsProtocol, mut receiver: GossipReceiver, mut head_lock: Arc<Mutex<BlockHead>>) -> Result<()> {
-    // init a peerid -> name hashmap
-    // let mut names: HashMap<_, String> = HashMap::new();
+async fn sync_blockchain(blockchain: BlockChain, mut receiver: GossipReceiver) -> Result<()> {
     while let Some(event) = receiver.try_next().await? {
         if let Event::Received(msg) = event {
-            let (_from, message) = SignedMessage::verify_and_decode(&msg.content)?;
+            let message = Message::decode(&msg.content)?;
             match message {
-                Message::NewBlockHead { link } => {
-                    let progress = downloader
-                            .download(link.hash(), Some(link.node_addr().node_id))
-                            .stream()
-                            .await;
-                    match progress {
-                        Ok(mut stream) => {
-                            // Handle the successful case
-                            while let Some(_event) = stream.next().await {
-                                // info!("Progress: {:?}", event);
-                            }
-
-                            let block_bytes: Bytes = blobs.get_bytes(link.hash()).await?;
-                            let block: Block = postcard::from_bytes(block_bytes.as_ref()).e()?;
-                            
-                            if block.evaluate(&blobs).await {
-                                loop {
-                                    if let Ok(mut bh) = head_lock.lock() {
-                                        if block.block_height > bh.block_height || bh.block_height == u128::MAX {
-                                            bh.hash = link.hash();
-                                            bh.block_height = block.block_height;   
-                                            println!("{} {}", bh.block_height, bh.hash);
-                                        }
-                                        break;
-                                    }
-                                }
-                                println!("> The block evaluates to true");
-                            } else {
-                                println!("> The block evaluates to false");
-                            }
-
-                            
-                        }
-                        Err(e) => {
-                            // Handle the error case
-                            continue;
-                        }
-                    }
-
+                Message::NewBlockHead { hash } => {
+                    let _ = blockchain.new_block(hash).await;
                 }
-                Message::RequestBlockHead { link } => {
+                Message::RequestBlockHead {} => {
+                    let _ = blockchain.broadcast_head().await;
                     // blocks_map.insert(from, name.clone());
                     // println!("{name}: {text}");
                 }
-                Message::RequestBlock { link } => {
-                    // blocks_map.insert(from, name.clone());
-                    // println!("> {} is now known as {}", from.fmt_short(), name);
-                }
-                Message::ResponseBlock { block } => {
-                    // let name = names
-                        // .get(&from)
-                        // .map_or_else(|| from.fmt_short(), String::to_string);
-                    // println!("{name}: {text}");
-                }
+                // Message::RequestBlock { link } => {
+                //     // blocks_map.insert(from, name.clone());
+                //     // println!("> {} is now known as {}", from.fmt_short(), name);
+                // }
+                // Message::ResponseBlock { block } => {
+                //     // let name = names
+                //         // .get(&from)
+                //         // .map_or_else(|| from.fmt_short(), String::to_string);
+                //     // println!("{name}: {text}");
+                // }
             }
+            let mut peers = blockchain.peers_lock.lock().await;
+            *peers = receiver.neighbors().collect();
         }
     }
     Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct SignedMessage {
-    from: PublicKey,
-    data: Bytes,
-    signature: Signature,
-}
 
-impl SignedMessage {
-    pub fn verify_and_decode(bytes: &[u8]) -> Result<(PublicKey, Message)> {
-        let signed_message: Self = postcard::from_bytes(bytes).e()?;
-        let key: PublicKey = signed_message.from;
-        key.verify(&signed_message.data, &signed_message.signature)
-            .e()?;
-        let message: Message = postcard::from_bytes(&signed_message.data).e()?;
-        Ok((signed_message.from, message))
-    }
-
-    pub fn sign_and_encode(secret_key: &SecretKey, message: &Message) -> Result<Bytes> {
-        let data: Bytes = postcard::to_stdvec(&message).e()?.into();
-        let signature = secret_key.sign(&data);
-        let from: PublicKey = secret_key.public();
-        let signed_message = Self {
-            from,
-            data,
-            signature,
-        };
-        let encoded = postcard::to_stdvec(&signed_message).e()?;
-        Ok(encoded.into())
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-enum Message {
-    NewBlockHead { link: BlobTicket },
-    RequestBlockHead { link: BlobTicket },
-    RequestBlock { link: BlobTicket },
-    ResponseBlock { block: Block },
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct Block {
     prev_hash: Hash,
     block_height: u128,
@@ -308,37 +336,23 @@ struct Block {
 }
 
 impl Block {
-    pub fn new(block_head: &BlockHead) -> Option<Self> {
+    pub fn new(block_head: BlockHead) -> Result<Self> {
         // Genesis block, these are both true. Normal block, neither are true
-        if (block_head.hash == Hash::EMPTY) != (block_head.block_height == u128::MAX) {
-            return None;
-        }
+        // if (block_head.hash == Hash::EMPTY) != (block_head.height == u128::MAX) {
+        //     whatever!("Head doesn't make sense")
+        // }
         let prev_hash = block_head.hash;
-        let block_height = block_head.block_height.wrapping_add(1);
+        let block_height = block_head.height.wrapping_add(1);
 
         let seed = Block {prev_hash, block_height, solution_bytes: Vec::new() }.calc_seed();
         let solution_bytes = ez_record_loop(&seed);
         if solution_bytes.len() == 0 {
-            return None
+            whatever!("Failed to mine");
         }
 
-        Some(Block { prev_hash, block_height, solution_bytes })
+        Ok(Block { prev_hash, block_height, solution_bytes })
     }
-    async fn evaluate(&self, blobs: &BlobsProtocol) -> bool {
-        if self.block_height != 0 {
-            let prev_block_bytes: Bytes = match blobs.get_bytes(self.prev_hash).await {
-                Ok(bytes) => bytes,
-                Err(_) => return false
-            };
-            let prev_block: Block = match postcard::from_bytes(prev_block_bytes.as_ref()).e() {
-                Ok(block) => block,
-                Err(_) => return false
-            };
-            if prev_block.block_height + 1 != self.block_height {
-                return false;
-            }
-        }
-
+    async fn evaluate_replay(&self) -> bool {
         ez_evaluate(&self.calc_seed(), &self.solution_bytes, 0)
     }
     fn calc_seed(&self) -> String {
@@ -348,12 +362,83 @@ impl Block {
         let result = hasher.finalize();
         hex::encode(result) // Convert the hash to a hex string
     }
+
     fn encode(&self) -> Result<Bytes> {
-        let encoded = postcard::to_stdvec(&self).e()?;
-        Ok(encoded.into())
+        Ok(postcard::to_stdvec(&self).e().expect("Failed to encode block").into())
     }
+
+    pub fn decode(bytes: &[u8]) -> Result<Block> {
+        Ok(postcard::from_bytes(bytes).e()?)
+    }
+
 }
 
+#[tokio::main]
+async fn main() -> Result<()> {
+    tracing_subscriber::fmt::init();
+    let args = Args::parse();
+
+    let endpoint = Endpoint::builder().relay_mode(RelayMode::Default).bind().await?;
+
+    let (blockchain, receiver) = match &args.command {
+        Command::Open{} => { // No ticket
+            BlockChain::new(endpoint, None).await.expect("Blockchain creation failed")
+        }
+        Command::Join { ticket } => { // Ticket provided
+            let t = Ticket::from_str(ticket).expect("Ticket is invalid");
+            BlockChain::new(endpoint, Some(t)).await.expect("Blockchain creation failed")
+        }
+    };
+
+
+    task::spawn(sync_blockchain(blockchain.clone(), receiver));
+
+    loop {
+        if args.record {
+            let res: Result<()> = {
+                println!("AAAA");
+                let head = blockchain.get_head().await.e()?;
+
+                // Mine a block
+                let new_block = Block::new(head).e()?;
+                println!("BBBB");
+
+                let new_hash = blockchain.add_block_blob(new_block).await.e()?;
+                println!("CCCC");
+
+                blockchain.new_block(new_hash).await
+            };
+            match res {
+                Ok(_) => continue,
+                Err(s) => println!("{:?}", s)
+            }
+            println!("EEEE");
+
+        
+        }
+        // let _ = blockchain.sync().await;
+        // blockchain.clear_temp_blocks().await;
+    }
+
+}
+
+
+
+#[derive(Debug, Serialize, Deserialize)]
+enum Message {
+    NewBlockHead { hash: Hash },
+    RequestBlockHead { },
+}
+
+impl Message {
+    pub fn decode(bytes: &[u8]) -> Result<Message> {
+        Ok(postcard::from_bytes(bytes).e()?)
+    }
+
+    fn encode(&self) -> Result<Bytes> {
+        Ok(postcard::to_stdvec(&self).e().expect("Failed to encode message").into())
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Ticket {
@@ -382,7 +467,7 @@ impl fmt::Display for Ticket {
 
 /// Deserializes from base32.
 impl FromStr for Ticket {
-    type Err = n0_snafu::Error;
+    type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let bytes = data_encoding::BASE32_NOPAD
             .decode(s.to_ascii_uppercase().as_bytes())
