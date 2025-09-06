@@ -34,9 +34,7 @@ use tokio::sync::Mutex;
 
 #[derive(Parser, Debug)]
 struct Args {
-    /// secret key to derive our node id from.
-    #[clap(long)]
-    secret_key: Option<String>,
+
     #[clap(subcommand)]
     command: Command,
     /// Enable mining
