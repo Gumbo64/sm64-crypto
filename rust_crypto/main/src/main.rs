@@ -7,7 +7,10 @@ use clap::Parser;
 use futures_lite::StreamExt;
 
 use n0_future::task;
-use n0_snafu::{Result, ResultExt, Error};
+use n0_snafu::{Result, ResultExt};
+
+use anyhow::Error as AnyhowError;
+use n0_snafu::Error as SnafuError;
 
 use serde::{Deserialize, Serialize};
 
@@ -18,13 +21,13 @@ mod use_exes;
 use use_exes::{ez_record_loop, ez_evaluate, remove_tmp_so_files};
 use sha2::{Sha256, Digest};
 
-
+use distributed_topic_tracker::{AutoDiscoveryGossip, RecordPublisher, TopicId, GossipReceiver, GossipSender};
 use iroh_blobs::{api::{ downloader::{Downloader, Shuffled}, tags::Tags }, store::fs::FsStore, BlobsProtocol, Hash };
 use iroh::{Endpoint, NodeAddr, PublicKey, RelayMode, Watcher };
 use iroh_gossip::{
-    api::{Event, GossipReceiver, GossipSender},
+    api::{Event},
     net::Gossip,
-    proto::{TopicId, DeliveryScope::{Neighbors, Swarm}}
+    proto::{DeliveryScope::{Neighbors, Swarm}}
 };
 
 use iroh::protocol::Router;
@@ -34,11 +37,6 @@ use tokio::sync::Mutex;
 
 #[derive(Parser, Debug)]
 struct Args {
-    /// secret key to derive our node id from.
-    #[clap(long)]
-    secret_key: Option<String>,
-    #[clap(subcommand)]
-    command: Command,
     /// Enable mining
     #[clap(short, long, default_value_t = false)]
     mine: bool,
@@ -237,9 +235,12 @@ impl BlockChain {
 
     async fn broadcast_block(&self, sender: &GossipSender, hash: Hash) -> Result<()> {
         let message = BlockMessage::NewBlockHead { hash };
-        let encoded = message.encode().e()?;
-        sender.broadcast_neighbors(encoded).await.e()?;
-        Ok(())
+        let encoded = message.encode().e()?.to_vec();
+        // sender.broadcast_neighbors(encoded).await.e()?;
+        match sender.broadcast(encoded).await {
+            Ok(_) => Ok(()),
+            Err(_) => whatever!("Broadcast block fail") // Convert the error
+        }
     }
 
     async fn broadcast_head(&self, blobs: &BlobsProtocol, tags: &Tags, sender: &GossipSender) -> Result<()> {
@@ -251,16 +252,15 @@ impl BlockChain {
     }
     async fn request_head(&self, sender: &GossipSender) -> Result<()> {
         let message = BlockMessage::RequestBlockHead{};
-        let encoded = message.encode().e()?;
-        sender.broadcast_neighbors(encoded).await.e()?;
-        Ok(())
+        let encoded = message.encode().e()?.to_vec();
+        match sender.broadcast(encoded).await {
+            Ok(_) => Ok(()),
+            Err(_) => whatever!("Request head fail") // Convert the error
+        }
     }
 
 
 }
-
-
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Block {
@@ -309,7 +309,7 @@ impl Block {
 
 async fn subscribe_loop(
     downloader: Downloader, blobs: BlobsProtocol, tags: Tags,
-    mut receiver: GossipReceiver, sender: GossipSender, db_lock: Arc<Mutex<()>> 
+    receiver: GossipReceiver, sender: GossipSender, db_lock: Arc<Mutex<()>> 
 ) -> Result<()> {
 
     let bc = BlockChain{};
@@ -320,8 +320,12 @@ async fn subscribe_loop(
     }
 
     bc.print_state(&blobs, &tags).await?;
+    while let Some(e) = receiver.next().await {
 
-    while let Some(event) = receiver.try_next().await? {
+        if e.is_err() {
+            continue;
+        }
+        let event = e?;
         let _guard = db_lock.lock().await;
         let res: Result<()> = {
             if let Event::Received(msg) = event {
@@ -332,7 +336,7 @@ async fn subscribe_loop(
                 let message = BlockMessage::decode(&msg.content)?;
                 match message {
                     BlockMessage::NewBlockHead { hash } => {
-                        let peer_vec: Vec<PublicKey> = receiver.neighbors().into_iter().collect();   
+                        let peer_vec: Vec<PublicKey> = receiver.neighbors().await.into_iter().collect();   
 
                         match bc.new_block(&blobs, &tags, &downloader, hash, peer_vec.clone()).await {
                             Ok(_) => {
@@ -367,17 +371,7 @@ async fn main() -> Result<()> {
 
     let endpoint = Endpoint::builder().relay_mode(RelayMode::Default).bind().await?;
 
-    let ticket = match &args.command {
-        Command::Open{} => { // No ticket
-            None
-        }
-        Command::Join { ticket } => { // Ticket provided
-            Some(Ticket::from_str(ticket).e()?)
-        }
-    };
     // Create protocols
-
-    let is_hosting = ticket.is_none();
 
 
     // let mut rng = rand::rng();
@@ -392,44 +386,25 @@ async fn main() -> Result<()> {
     let tags = blobs.tags();
     let downloader = store.downloader(&endpoint);
 
-    // Setup router
-    let _router = Router::builder(endpoint.clone())
-        .accept(iroh_blobs::ALPN, blobs.clone())
-        .accept(iroh_gossip::ALPN, gossip.clone())
-        .spawn();
+    // [Distributed Topic Tracker]
+    let topic_id = TopicId::new("sm64-crypto".to_string());
+    let initial_secret = b"googoo gaga".to_vec();
+    let record_publisher = RecordPublisher::new(
+        topic_id.clone(),
+        endpoint.node_id(),
+        endpoint.secret_key().secret().clone(),
+        None,
+        initial_secret,
+    );
 
-    // Absorb ticket
-    let mut topic = TopicId::from_bytes(rand::random());
-    let mut peers = vec![];
-    if let Some(t) = ticket {
-        topic = t.topic;
-        peers = t.peers;
-    }
+    // A new field "subscribe_and_join_with_auto_discovery/_no_wait" 
+    // is available on iroh_gossip::net::Gossip
+    let topic = gossip
+        .subscribe_and_join_with_auto_discovery(record_publisher)
+        .await.expect("Topic subscription failed");
+    let (sender, receiver)  = topic.split().await.expect("topic split failed");
 
-    // Join peers
-    let peer_ids = peers.iter().map(|p| p.node_id).collect();
-    for peer in peers.clone().into_iter() {
-        endpoint.add_node_addr(peer).ok();
-    }
-
-    // Join/create gossip chat
-    let (sender, receiver) = match is_hosting{
-        true => {
-            gossip.subscribe(topic, peer_ids).await.e()?.split()
-        },
-        false => {
-            println!("Waiting to join....");
-            gossip.subscribe_and_join(topic, peer_ids).await.e()?.split()
-        }
-    };
-
-    // Print new ticket including us
-    let ticket_with_me: Ticket = {
-        let me = endpoint.node_addr().initialized().await;
-        let peers = peers.iter().cloned().chain([me]).collect();
-        Ticket { topic, peers }
-    };
-    println!("> ticket to join us: {ticket_with_me}");
+    println!("[joined topic]");
 
     let db_lock = Arc::new(Mutex::new(()));
 
@@ -489,40 +464,3 @@ impl BlockMessage {
         Ok(postcard::to_stdvec(&self).e()?.into())
     }
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Ticket {
-    topic: TopicId,
-    peers: Vec<NodeAddr>,
-}
-impl Ticket {
-    /// Deserializes from bytes.
-    fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        postcard::from_bytes(bytes).e()
-    }
-    /// Serializes to bytes.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        postcard::to_stdvec(self).expect("postcard::to_stdvec is infallible")
-    }
-}
-
-/// Serializes to base32.
-impl fmt::Display for Ticket {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut text = data_encoding::BASE32_NOPAD.encode(&self.to_bytes()[..]);
-        text.make_ascii_lowercase();
-        write!(f, "{text}")
-    }
-}
-
-/// Deserializes from base32.
-impl FromStr for Ticket {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = data_encoding::BASE32_NOPAD
-            .decode(s.to_ascii_uppercase().as_bytes())
-            .e()?;
-        Self::from_bytes(&bytes)
-    }
-}
-

@@ -9,6 +9,7 @@ bytes = "1.10.1"
 clap = { version = "4.5.47", features = ["derive"] }
 ctrlc = "3.4.7"
 data-encoding = "2.9.0"
+distributed-topic-tracker = "0.1.5"
 ed25519-dalek = "2.2.0"
 futures-lite = "2.6.1"
 hex = "0.4.3"
