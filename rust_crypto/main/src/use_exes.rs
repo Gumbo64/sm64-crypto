@@ -31,11 +31,8 @@ pub fn ez_record_loop(seed: &str) -> Vec<u8> {
         let success = ez_evaluate(seed, &solution_bytes.clone(), 0);
 
         if success {
-            println!("Hooray! it works");
             break;
-        } else {
-            println!("It failed bro go back cuz");
-        }    
+        }
     }
     solution_bytes
 }
@@ -67,3 +64,26 @@ pub fn ez_evaluate(seed: &str, solution_bytes: &Vec<u8>, fps: i8) -> bool {
     success
 }
 
+use std::fs;
+use std::io;
+use std::path::Path;
+pub fn remove_tmp_so_files<P: AsRef<Path>>(dir: P) -> io::Result<()> {
+    let dir = dir.as_ref().join("tmp_so");
+    if !dir.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if let Some(ext) = path.extension() {
+            if ext == "so" {
+                if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
+                    if fname.ends_with(".tmp.so") {
+                        fs::remove_file(&path)?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
