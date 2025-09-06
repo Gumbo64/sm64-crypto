@@ -444,7 +444,7 @@ async fn main() -> Result<()> {
             if args.mine {
                 let head = bc.get_head(&blobs, tags).await.e()?;
 
-                // Mine a block
+                // Mine a block. Release and then retake the lock after you finish playing
                 drop(_guard);
                 let new_block = Block::new(head).e()?;
                 _guard = db_lock.lock().await;
@@ -453,10 +453,14 @@ async fn main() -> Result<()> {
                 let new_hash = bc.add_block_blob(&blobs, new_block).await.e()?;
 
                 // You never have to download anything since you mined it locally, therefore no peers are needed
-                bc.new_block(&blobs, tags, &downloader, new_hash, vec![]).await?;
-                bc.broadcast_block(&sender, new_hash).await?;
+                match bc.new_block(&blobs, tags, &downloader, new_hash, vec![]).await {
+                    Ok(_) => {
+                        bc.broadcast_block(&sender, new_hash).await?;
+                        bc.print_state(&blobs, &tags).await?;
+                    },
+                    Err(_) => {}
+                }
 
-                bc.print_state(&blobs, &tags).await?;
             }
 
             Ok(())
