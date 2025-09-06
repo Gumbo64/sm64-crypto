@@ -40,6 +40,9 @@ struct Args {
     /// Enable mining
     #[clap(short, long, default_value_t = false)]
     mine: bool,
+    /// Wait for a connection before starting
+    #[clap(short, long, default_value_t = true)]
+    wait: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -271,10 +274,6 @@ struct Block {
 
 impl Block {
     pub fn new(block_head: BlockHead) -> Result<Self> {
-        // Genesis block, these are both true. Normal block, neither are true
-        // if (block_head.hash == Hash::EMPTY) != (block_head.height == u128::MAX) {
-        //     whatever!("Head doesn't make sense")
-        // }
         let prev_hash = block_head.hash;
         let block_height = block_head.height.wrapping_add(1);
 
@@ -321,10 +320,10 @@ async fn subscribe_loop(
 
     bc.print_state(&blobs, &tags).await?;
     while let Some(e) = receiver.next().await {
-
         if e.is_err() {
             continue;
         }
+        println!("\n\nNew message\n\n");
         let event = e?;
         let _guard = db_lock.lock().await;
         let res: Result<()> = {
@@ -369,10 +368,12 @@ async fn main() -> Result<()> {
 
     remove_tmp_so_files(".").e()?;
 
-    let endpoint = Endpoint::builder().relay_mode(RelayMode::Default).bind().await?;
+    let endpoint = Endpoint::builder()
+        .discovery_n0()
+        .bind()
+        .await?;
 
     // Create protocols
-
 
     // let mut rng = rand::rng();
     // let store_path = format!("my_blockchain_{}{}{}", rng.sample(rand::distr::Alphanumeric) as char, rng.sample(rand::distr::Alphanumeric) as char, rng.sample(rand::distr::Alphanumeric) as char);
@@ -385,6 +386,12 @@ async fn main() -> Result<()> {
     let gossip = Gossip::builder().spawn(endpoint.clone());
     let tags = blobs.tags();
     let downloader = store.downloader(&endpoint);
+
+    // Setup router
+    let _router = Router::builder(endpoint.clone())
+        .accept(iroh_blobs::ALPN, blobs.clone())
+        .accept(iroh_gossip::ALPN, gossip.clone())
+        .spawn();
 
     // [Distributed Topic Tracker]
     let topic_id = TopicId::new("sm64-crypto".to_string());
@@ -399,9 +406,17 @@ async fn main() -> Result<()> {
 
     // A new field "subscribe_and_join_with_auto_discovery/_no_wait" 
     // is available on iroh_gossip::net::Gossip
-    let topic = gossip
-        .subscribe_and_join_with_auto_discovery(record_publisher)
-        .await.expect("Topic subscription failed");
+    let topic;
+    if args.wait {
+        topic = gossip
+            .subscribe_and_join_with_auto_discovery(record_publisher)
+            .await.expect("Topic subscription failed");
+    } else {
+        topic = gossip
+            .subscribe_and_join_with_auto_discovery_no_wait(record_publisher)
+            .await.expect("Topic subscription failed");
+    }
+
     let (sender, receiver)  = topic.split().await.expect("topic split failed");
 
     println!("[joined topic]");
