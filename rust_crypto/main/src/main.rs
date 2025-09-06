@@ -329,10 +329,10 @@ async fn subscribe_loop(
         let _guard = db_lock.lock().await;
         let res: Result<()> = {
             if let Event::Received(msg) = event {
-                match msg.scope {
-                    Neighbors => {} // Only accept direct neighbour messages
-                    Swarm(_) => {continue;}
-                }
+                // match msg.scope {
+                //     Neighbors => {} // Only accept direct neighbour messages
+                //     Swarm(_) => {continue;}
+                // }
                 let message = BlockMessage::decode(&msg.content)?;
                 match message {
                     BlockMessage::NewBlockHead { hash } => {
