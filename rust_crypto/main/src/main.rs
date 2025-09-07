@@ -240,7 +240,7 @@ impl BlockChain {
         let message = BlockMessage::NewBlockHead { hash };
         let encoded = message.encode().e()?.to_vec();
         // sender.broadcast_neighbors(encoded).await.e()?;
-        match sender.broadcast(encoded).await {
+        match sender.broadcast_neighbors(encoded).await {
             Ok(_) => Ok(()),
             Err(_) => whatever!("Broadcast block fail") // Convert the error
         }
@@ -256,7 +256,7 @@ impl BlockChain {
     async fn request_head(&self, sender: &GossipSender) -> Result<()> {
         let message = BlockMessage::RequestBlockHead{};
         let encoded = message.encode().e()?.to_vec();
-        match sender.broadcast(encoded).await {
+        match sender.broadcast_neighbors(encoded).await {
             Ok(_) => Ok(()),
             Err(_) => whatever!("Request head fail") // Convert the error
         }
@@ -323,15 +323,14 @@ async fn subscribe_loop(
         if e.is_err() {
             continue;
         }
-        println!("\n\nNew message\n\n");
         let event = e?;
         let _guard = db_lock.lock().await;
         let res: Result<()> = {
             if let Event::Received(msg) = event {
-                // match msg.scope {
-                //     Neighbors => {} // Only accept direct neighbour messages
-                //     Swarm(_) => {continue;}
-                // }
+                match msg.scope {
+                    Neighbors => {} // Only accept direct neighbour messages
+                    Swarm(_) => {continue;}
+                }
                 let message = BlockMessage::decode(&msg.content)?;
                 match message {
                     BlockMessage::NewBlockHead { hash } => {
@@ -428,37 +427,30 @@ async fn main() -> Result<()> {
     let bc = BlockChain{};
 
     loop {
-        let res: Result<()> = {
-            let mut _guard = db_lock.lock().await;
+        let mut _guard = db_lock.lock().await;
 
-            if args.mine {
-                let head = bc.get_head(&blobs, tags).await.e()?;
+        if args.mine {
+            let head = bc.get_head(&blobs, tags).await.e()?;
 
-                // Mine a block. Release and then retake the lock after you finish playing
-                drop(_guard);
-                let new_block = Block::new(head).e()?;
-                _guard = db_lock.lock().await;
+            // Mine a block. Release and then retake the lock after you finish playing
+            drop(_guard);
+            let new_block = Block::new(head).e()?;
+            _guard = db_lock.lock().await;
 
-                // Add block to blobs
-                let new_hash = bc.add_block_blob(&blobs, new_block).await.e()?;
+            // Add block to blobs
+            let new_hash = bc.add_block_blob(&blobs, new_block).await.e()?;
 
-                // You never have to download anything since you mined it locally, therefore no peers are needed
-                match bc.new_block(&blobs, tags, &downloader, new_hash, vec![]).await {
-                    Ok(_) => {
-                        bc.broadcast_block(&sender, new_hash).await?;
-                        bc.print_state(&blobs, &tags).await?;
-                    },
-                    Err(_) => {}
-                }
-
+            // You never have to download anything since you mined it locally, therefore no peers are needed
+            match bc.new_block(&blobs, tags, &downloader, new_hash, vec![]).await {
+                Ok(_) => {
+                    bc.broadcast_block(&sender, new_hash).await?;
+                    bc.print_state(&blobs, &tags).await?;
+                },
+                Err(_) => {}
             }
 
-            Ok(())
-        };
-        match res {
-            Ok(_) => continue,
-            Err(s) => println!("{:?}", s)
         }
+
     }
 }
 
