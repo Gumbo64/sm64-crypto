@@ -1,6 +1,4 @@
-use std::{
-    fmt, str::FromStr, u128
-};
+use std::u128;
 
 use bytes::Bytes;
 use clap::Parser;
@@ -8,9 +6,6 @@ use futures_lite::StreamExt;
 
 use n0_future::task;
 use n0_snafu::{Result, ResultExt};
-
-use anyhow::Error as AnyhowError;
-use n0_snafu::Error as SnafuError;
 
 use serde::{Deserialize, Serialize};
 
@@ -23,13 +18,13 @@ use sha2::{Sha256, Digest};
 
 use distributed_topic_tracker::{AutoDiscoveryGossip, RecordPublisher, TopicId, GossipReceiver, GossipSender};
 use iroh_blobs::{api::{ downloader::{Downloader, Shuffled}, tags::Tags }, store::fs::FsStore, BlobsProtocol, Hash };
-use iroh::{Endpoint, NodeAddr, PublicKey, RelayMode, Watcher };
+use iroh::{Endpoint, PublicKey };
 use iroh_gossip::{
     api::{Event},
     net::Gossip,
     proto::{DeliveryScope::{Neighbors, Swarm}}
 };
-
+use std::sync::atomic::{AtomicBool, Ordering};
 use iroh::protocol::Router;
 // use iroh_docs::{protocol::Docs};
 use std::sync::Arc;
@@ -41,8 +36,8 @@ struct Args {
     #[clap(short, long, default_value_t = false)]
     mine: bool,
     /// Wait for a connection before starting
-    #[clap(short, long, default_value_t = true)]
-    wait: bool,
+    #[clap(short, long, default_value_t = false)]
+    nowait: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -308,7 +303,8 @@ impl Block {
 
 async fn subscribe_loop(
     downloader: Downloader, blobs: BlobsProtocol, tags: Tags,
-    receiver: GossipReceiver, sender: GossipSender, db_lock: Arc<Mutex<()>> 
+    receiver: GossipReceiver, sender: GossipSender, 
+    db_lock: Arc<Mutex<()>>
 ) -> Result<()> {
 
     let bc = BlockChain{};
@@ -321,6 +317,7 @@ async fn subscribe_loop(
     bc.print_state(&blobs, &tags).await?;
     while let Some(e) = receiver.next().await {
         if e.is_err() {
+            println!("error receiver");
             continue;
         }
         let event = e?;
@@ -341,7 +338,7 @@ async fn subscribe_loop(
                                 bc.broadcast_head(&blobs, &tags, &sender).await?;
                                 bc.print_state(&blobs, &tags).await?;
                             },
-                            Err(_) => {}
+                            Err(_) => {println!("New block failed")}
                         }
                     },
                     BlockMessage::RequestBlockHead {} => {
@@ -366,6 +363,13 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     remove_tmp_so_files(".").e()?;
+    
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    }).expect("Error setting Ctrl-C handler");
+
 
     let endpoint = Endpoint::builder()
         .discovery_n0()
@@ -406,7 +410,7 @@ async fn main() -> Result<()> {
     // A new field "subscribe_and_join_with_auto_discovery/_no_wait" 
     // is available on iroh_gossip::net::Gossip
     let topic;
-    if args.wait {
+    if !args.nowait {
         topic = gossip
             .subscribe_and_join_with_auto_discovery(record_publisher)
             .await.expect("Topic subscription failed");
@@ -418,7 +422,7 @@ async fn main() -> Result<()> {
 
     let (sender, receiver)  = topic.split().await.expect("topic split failed");
 
-    println!("[joined topic]");
+    println!("\n[Found peers]\n");
 
     let db_lock = Arc::new(Mutex::new(()));
 
@@ -426,7 +430,7 @@ async fn main() -> Result<()> {
 
     let bc = BlockChain{};
 
-    loop {
+    while running.load(Ordering::SeqCst) {
         let mut _guard = db_lock.lock().await;
 
         if args.mine {
@@ -446,12 +450,14 @@ async fn main() -> Result<()> {
                     bc.broadcast_block(&sender, new_hash).await?;
                     bc.print_state(&blobs, &tags).await?;
                 },
-                Err(_) => {}
+                Err(_) => {println!("New block failed")}
             }
 
         }
 
     }
+    println!("Ending the program");
+    Ok(())
 }
 
 
