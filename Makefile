@@ -23,7 +23,6 @@ all: copy-rom
 	cp $(RELEASE)/evaluate $(PROD)/evaluate
 	cp $(RELEASE)/record $(PROD)/record
 
-
 	cp $(SM64PC)/build/us_pc_headless/sm64.us prod/sm64_headless.us
 	cp $(SM64PC)/build/us_pc/sm64.us prod/sm64.us
 

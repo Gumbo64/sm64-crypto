@@ -5,4 +5,3 @@ members = [
     "sm64/record", 
     "sm64/sm64_so"
 ]
-resolver = "3"

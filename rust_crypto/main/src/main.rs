@@ -133,9 +133,9 @@ impl BlockChain {
                 let s_peers = Shuffled::new(peers);
                 let mut progress = downloader.download(hash, s_peers)
                     .stream().await.e()?;
-                while let Some(_event) = progress.next().await {
-                    // info!("Progress: {:?}", event);
-                }
+
+                while let Some(_event) = progress.next().await {}
+
                 Ok(self.get_local_block(blobs, hash).await?)
             }
         }
@@ -434,7 +434,7 @@ async fn main() -> Result<()> {
 
         if args.mine {
             let mut _guard = db_lock.lock().await;
-            
+
             let head = bc.get_head(&blobs, tags).await.e()?;
 
             // Mine a block. Release and then retake the lock after you finish playing

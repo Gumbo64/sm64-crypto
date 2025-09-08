@@ -263,11 +263,28 @@ fn distance(pos: &[f32; 3], goal: &[f32; 3]) -> f32 {
 }
 
 pub fn eval_metric(game: &SM64Game) -> bool {
-    let goal = [-153.0_f32, 840.0, -356.0];
-    let m = game.get_mario_state();
-
-    distance(&m.pos, &goal) < 300.0
+    eval_metric_star(game)
 }
+
+pub fn eval_metric_star(game: &SM64Game) -> bool {
+    let m = game.get_mario_state();
+    m.numStars == 1
+}
+
+
+// pub fn eval_metric_bridge(game: &SM64Game) -> bool {
+//     let goal = [-153.0_f32, 840.0, -356.0];
+//     let m = game.get_mario_state();
+
+//     distance(&m.pos, &goal) < 300.0
+// }
+
+// pub fn eval_metric_bridge(game: &SM64Game) -> bool {
+//     let goal = [-153.0_f32, 840.0, -356.0];
+//     let m = game.get_mario_state();
+
+//     distance(&m.pos, &goal) < 300.0
+// }
 
 // pub fn eval_metric_bob(game: &SM64Game) -> bool {
 //     let m = game.get_mario_state();
