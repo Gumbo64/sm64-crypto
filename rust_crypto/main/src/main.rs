@@ -431,9 +431,10 @@ async fn main() -> Result<()> {
     let bc = BlockChain{};
 
     while running.load(Ordering::SeqCst) {
-        let mut _guard = db_lock.lock().await;
 
         if args.mine {
+            let mut _guard = db_lock.lock().await;
+            
             let head = bc.get_head(&blobs, tags).await.e()?;
 
             // Mine a block. Release and then retake the lock after you finish playing
