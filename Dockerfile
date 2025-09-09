@@ -13,9 +13,10 @@ RUN apt-get install -y git build-essential pkg-config libusb-1.0-0-dev libsdl2-d
 VOLUME ["/usr/src/sm64-crypto/prod"]
 
 
-EXPOSE 80
-EXPOSE 8080 9090 3000
+RUN make
+RUN cd rust_crypto && cargo clean && cd ../
+CMD ["/bin/sh", "-c", "cd prod && ./main"]
 
-# add SM64_ARG="--mine" if you want to mine
-ENV SM64_ARG=""
-CMD ["/bin/sh", "-c", "if [ -d ./prod ] && [ -f ./prod/main ]; then cd ./prod && ./main $SM64_ARG; else cp ./prod/baserom.us.z64 . && make && cd ./prod && ./main $SM64_ARG; fi"]
+# ENV SM64_ARG=""
+# CMD ["/bin/sh", "-c", "if [ -d ./prod ] && [ -f ./prod/main ]; then cd ./prod && ./main $SM64_ARG; else cp ./prod/baserom.us.z64 . && make && cd ./prod && ./main $SM64_ARG; fi"]
+

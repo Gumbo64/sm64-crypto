@@ -28,14 +28,14 @@ The following instructions are based off the [sm64-port repository](https://www.
 5. The executable binary will be located at `prod/main`
 
 
-### Docker
-
-mining doesn't work in the docker yet unfortunately. Hopefully I can find a way
-
-1. install docker
-2. `sudo docker build -t sm64-crypto .`
-3. make a folder and put baserom.us.z64 in the folder
-4. `sudo docker run -e SM64_ARG="" -v /PATH/TO/YOUR/FOLDER:/usr/src/sm64-crypto/prod sm64-crypto`
+### Podman Desktop (windows etc)
+1. Put baserom.us.z64 in the root folder (next to readme.md etc)
+2. On podman desktop, go Containers -> Create -> Containerfile or Dockerfile (purple)
+3. Select Containerfile path by navigating to this folder, then selecting Dockerfile
+4. Name it sm64-crypto optionally
+5. Click Build and wait for it to build
+6. Once it's done, go to Images and click the icon next to the sm64-crypto image that looks like a play button
+7. go to the bottom and click Start Container
 
 <!-- ### Windows
 
