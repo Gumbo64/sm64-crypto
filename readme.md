@@ -30,6 +30,12 @@ The following instructions are based off the [sm64-port repository](https://www.
 
 ### Docker
 
+mining doesn't work in the docker yet unfortunately. Hopefully I can find a way
+
+1. install docker
+2. `sudo docker build -t sm64-crypto .`
+3. make a folder and put baserom.us.z64 in the folder
+4. `sudo docker run -e SM64_ARG="" -v /PATH/TO/YOUR/FOLDER:/usr/src/sm64-crypto/prod sm64-crypto`
 
 <!-- ### Windows
 

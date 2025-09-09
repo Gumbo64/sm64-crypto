@@ -363,6 +363,8 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     remove_tmp_so_files(".").e()?;
+
+    println!("mine {}, nowait {}", args.mine, args.nowait);
     
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
