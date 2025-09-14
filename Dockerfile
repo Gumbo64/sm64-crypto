@@ -8,7 +8,7 @@ COPY . .
 
 # Install any needed packages specified in requirements.txt
 RUN apt-get update && apt-get install -y make
-RUN apt-get install -y git build-essential pkg-config libusb-1.0-0-dev libsdl2-dev
+RUN apt-get install -y git build-essential pkg-config libusb-1.0-0-dev libsdl2-dev bsdmainutils
 
 VOLUME ["/usr/src/sm64-crypto/prod"]
 

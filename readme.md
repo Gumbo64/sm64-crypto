@@ -20,7 +20,7 @@ The following instructions are based off the [sm64-port repository](https://www.
 
 ### Linux
 
-1. Install prerequisites (Ubuntu): `sudo apt install -y git build-essential pkg-config libusb-1.0-0-dev libsdl2-dev`.
+1. Install prerequisites (Ubuntu): `sudo apt install -y git build-essential pkg-config libusb-1.0-0-dev libsdl2-dev bsdmainutils`.
 2. Clone this repo which will create a directory and then cd into it.
 <!-- 2. Clone the repo: `git clone https://github.com/sm64-port/sm64-port.git`, which will create a directory `sm64-port` and then **enter** it `cd sm64-port`. -->
 3. Place the sm64 z64 file renamed to `baserom.us.z64` into the repository's root directory.
