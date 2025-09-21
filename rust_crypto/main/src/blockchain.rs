@@ -61,12 +61,13 @@ impl Default for BlockHead {
 
 #[derive(Debug)]
 pub struct BlockChain {
-    downloader: Downloader, blobs: BlobsProtocol, tags: Tags,
+    router: Router, downloader: Downloader, blobs: BlobsProtocol, tags: Tags,
     sender: GossipSender, db_lock: Arc<Mutex<()>>
 }
 impl Clone for BlockChain {
     fn clone(&self) -> Self {
         BlockChain {
+            router: self.router.clone(),
             downloader: self.downloader.clone(), 
             blobs: self.blobs.clone(),
             tags: self.tags.clone(),
@@ -96,7 +97,7 @@ impl BlockChain {
         let downloader = store.downloader(&endpoint);
 
         // Setup router
-        let _router = Router::builder(endpoint.clone())
+        let router = Router::builder(endpoint.clone())
             .accept(iroh_blobs::ALPN, blobs.clone())
             .accept(iroh_gossip::ALPN, gossip.clone())
             .spawn();
@@ -130,7 +131,7 @@ impl BlockChain {
 
         let db_lock = Arc::new(Mutex::new(()));
 
-        let bc = BlockChain{downloader, blobs, tags, sender, db_lock};
+        let bc = BlockChain{router, downloader, blobs, tags, sender, db_lock};
         task::spawn(BlockChain::subscribe_loop(bc.clone(), receiver));
         Ok(bc)
     }
@@ -229,18 +230,14 @@ impl BlockChain {
         match self.get_local_block(hash).await {
             Ok(b) => Ok(b), // We have it locally
             Err(_e) => { // Try to get it from peers
-                println!("bbbbb");
                 let s_peers = Shuffled::new(peers);
-                println!("ccccc");
 
                 let mut progress = self.downloader.download(hash, s_peers)
                     .stream().await.e()?;
-                println!("dddddd");
 
                 while let Some(_event) = progress.next().await {
                     println!("{:?}", _event);
                 }
-                println!("eeeeee");
                 match self.get_local_block(hash).await {
                     Ok(b) => Ok(b),
                     Err(e) => {
@@ -248,7 +245,6 @@ impl BlockChain {
                         return Err(e);
                     } 
                 }
-                // self.get_foreign_block(hash, peers).await
             }
         }
     }
@@ -285,9 +281,7 @@ impl BlockChain {
     }
 
     async fn new_block(&self, new_head_hash: Hash, peers: Vec<PublicKey>) -> Result<()> {
-        println!("aaaaaa");
         let new_head = self.get_foreign_block(new_head_hash, peers.clone()).await.e()?;
-        println!("aaaa end");
 
         // check that the new block is even worth it, it should be higher than our head
         let head = self.get_head().await.e()?;
