@@ -89,7 +89,7 @@ impl BlockChain {
             .bind()
             .await?;
 
-        let store_path = String::from("blockchain");
+        let store_path = String::from("blockchain_data");
 
         let store = FsStore::load(store_path).await.expect("failed to load fs");
 
