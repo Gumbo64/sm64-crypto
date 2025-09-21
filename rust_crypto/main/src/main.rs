@@ -50,7 +50,7 @@ async fn main() -> Result<()> {
 
     while running.load(Ordering::SeqCst) {
         if args.mine {
-            bc.mine().await?;
+            bc.mine().await;
         }
     }
 

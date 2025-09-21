@@ -22,6 +22,7 @@ all: copy-rom
 # 	rm -r prod2
 
 	mkdir -p prod
+	mkdir -p prod2
 	cp $(RELEASE)/main $(PROD)/main
 	cp $(RELEASE)/evaluate $(PROD)/evaluate
 	cp $(RELEASE)/record $(PROD)/record
@@ -29,7 +30,7 @@ all: copy-rom
 	cp $(SM64PC)/build/us_pc_headless/sm64.us prod/sm64_headless.us
 	cp $(SM64PC)/build/us_pc/sm64.us prod/sm64.us
 
-	cp -r prod prod2
+	cp -r prod/* prod2
 
 
 # Define a target to copy the ROM file into the SM64PC

@@ -12,7 +12,7 @@ use snafu::whatever;
 
 mod use_exes;
 
-use use_exes::{ez_record_loop, ez_evaluate, remove_tmp_so_files};
+use use_exes::{record, ez_evaluate, remove_tmp_so_files};
 use sha2::{Sha256, Digest};
 
 use distributed_topic_tracker::{AutoDiscoveryGossip, RecordPublisher, TopicId, GossipReceiver, GossipSender};
@@ -29,9 +29,11 @@ use iroh::protocol::Router;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use crate::blockchain::use_exes::record_loop;
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct BlockHead {
+pub struct BlockHead {
     hash: Hash,
     height: u128,
 }
@@ -62,7 +64,7 @@ impl Default for BlockHead {
 #[derive(Debug)]
 pub struct BlockChain {
     router: Router, downloader: Downloader, blobs: BlobsProtocol, tags: Tags,
-    sender: GossipSender, db_lock: Arc<Mutex<()>>
+    sender: GossipSender, db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>
 }
 impl Clone for BlockChain {
     fn clone(&self) -> Self {
@@ -73,6 +75,7 @@ impl Clone for BlockChain {
             tags: self.tags.clone(),
             sender: self.sender.clone(),
             db_lock: Arc::clone(&self.db_lock), // We need to make sure it uses this function not just .clone()
+            new_block_signal: Arc::clone(&self.new_block_signal)
         }
     }
 }
@@ -130,8 +133,8 @@ impl BlockChain {
         println!("\n[Found peers]\n");
 
         let db_lock = Arc::new(Mutex::new(()));
-
-        let bc = BlockChain{router, downloader, blobs, tags, sender, db_lock};
+        let new_block_signal = Arc::new(Mutex::new(false));
+        let bc = BlockChain{router, downloader, blobs, tags, sender, db_lock, new_block_signal};
         task::spawn(BlockChain::subscribe_loop(bc.clone(), receiver));
         Ok(bc)
     }
@@ -163,7 +166,6 @@ impl BlockChain {
                     match message {
                         BlockMessage::NewBlockHead { hash } => {
                             let peer_vec: Vec<PublicKey> = receiver.neighbors().await.into_iter().collect();   
-                            println!("{:?}", peer_vec);
                             match bc.new_block(hash, peer_vec.clone()).await {
                                 Ok(_) => {
                                     bc.broadcast_head().await?;
@@ -186,7 +188,7 @@ impl BlockChain {
         }
         Ok(())
     }
-    async fn print_state(&self) -> Result<()> {
+    pub async fn print_state(&self) -> Result<()> {
         let head = self.get_head().await?;
         if !head.no_blocks() {
             println!("Current height: {}\nCurrent hash: {:?}", head.height, head.hash);
@@ -196,7 +198,7 @@ impl BlockChain {
         Ok(())
     }
 
-    async fn get_head(&self) -> Result<BlockHead> {
+    pub async fn get_head(&self) -> Result<BlockHead> {
         let ott = self.tags.get(String::from("head")).await;
 
         match ott {
@@ -235,13 +237,10 @@ impl BlockChain {
                 let mut progress = self.downloader.download(hash, s_peers)
                     .stream().await.e()?;
 
-                while let Some(_event) = progress.next().await {
-                    println!("{:?}", _event);
-                }
+                while let Some(_event) = progress.next().await {}
                 match self.get_local_block(hash).await {
                     Ok(b) => Ok(b),
                     Err(e) => {
-                        println!("{:?}", e);
                         return Err(e);
                     } 
                 }
@@ -335,6 +334,9 @@ impl BlockChain {
         self.set_head(new_blockhead).await.e()?;
         self.clear_temp_blocks().await?;
 
+        let mut new_block_signal = self.new_block_signal.lock().await;
+        *new_block_signal = true;
+
         Ok(())
     }
 
@@ -363,14 +365,32 @@ impl BlockChain {
             Err(_) => whatever!("Request head fail") // Convert the error
         }
     }
-    pub async fn mine(&self) -> Result<> {
+    pub async fn mine(&self) {
+        loop {
+            match self.mine_attempt().await {
+                Ok(_) => {
+                    return;
+                },
+                Err(e) => {
+                    println!("Resetting the game so we're mining from the newest block");
+                }
+            }
+        }
+    }
+    async fn mine_attempt(&self) -> Result<()> {
         let mut _guard = self.db_lock.lock().await;
+
+        {
+            // If any new blocks are made while we're playing, then it will kill the recording session
+            let mut new_block_signal = self.new_block_signal.lock().await;
+            *new_block_signal = false;
+        }
 
         let head = self.get_head().await.e()?;
 
         // Mine a block. Release and then retake the lock after you finish playing
         drop(_guard);
-        let new_block = Block::new(head).e()?;
+        let new_block = Block::new(head, self.new_block_signal.clone()).e()?;
         _guard = self.db_lock.lock().await;
 
         // Add block to blobs
@@ -386,7 +406,6 @@ impl BlockChain {
         }
         Ok(())
     }
-
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -397,15 +416,19 @@ struct Block {
 }
 
 impl Block {
-    pub fn new(block_head: BlockHead) -> Result<Self> {
+    pub fn new(block_head: BlockHead, kill_signal: Arc<Mutex<bool>>) -> Result<Self> {
         let prev_hash = block_head.hash;
         let block_height = block_head.height.wrapping_add(1);
 
         let seed = Block {prev_hash, block_height, solution_bytes: Vec::new() }.calc_seed();
-        let solution_bytes = ez_record_loop(&seed);
-        if solution_bytes.len() == 0 {
-            whatever!("Failed to mine");
-        }
+        // let solution_bytes = ez_record_loop(&seed);
+        // if solution_bytes.len() == 0 {
+            // whatever!("Failed to mine");
+        // }
+        
+        let solution_bytes = record_loop(&seed, kill_signal)?;
+
+
 
         Ok(Block { prev_hash, block_height, solution_bytes })
     }
