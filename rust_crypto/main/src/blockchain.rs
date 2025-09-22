@@ -61,7 +61,8 @@ impl Default for BlockHead {
 #[derive(Debug)]
 pub struct BlockChain {
     router: Router, downloader: Downloader, blobs: BlobsProtocol, tags: Tags,
-    sender: GossipSender, db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>
+    sender: GossipSender, db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>,
+    showblocks: bool
 }
 impl Clone for BlockChain {
     fn clone(&self) -> Self {
@@ -72,13 +73,14 @@ impl Clone for BlockChain {
             tags: self.tags.clone(),
             sender: self.sender.clone(),
             db_lock: Arc::clone(&self.db_lock), // We need to make sure it uses this function not just .clone()
-            new_block_signal: Arc::clone(&self.new_block_signal)
+            new_block_signal: Arc::clone(&self.new_block_signal),
+            showblocks: self.showblocks.clone()
         }
     }
 }
 
 impl BlockChain {
-    pub async fn new(nowait: bool) -> Result<BlockChain> {
+    pub async fn new(nowait: bool, showblocks: bool) -> Result<BlockChain> {
         remove_tmp_so_files(".").e()?;
 
         let endpoint = Endpoint::builder()
@@ -131,7 +133,7 @@ impl BlockChain {
 
         let db_lock = Arc::new(Mutex::new(()));
         let new_block_signal = Arc::new(Mutex::new(false));
-        let bc = BlockChain{router, downloader, blobs, tags, sender, db_lock, new_block_signal};
+        let bc = BlockChain{router, downloader, blobs, tags, sender, db_lock, new_block_signal, showblocks};
         task::spawn(BlockChain::subscribe_loop(bc.clone(), receiver));
         Ok(bc)
     }
@@ -167,6 +169,9 @@ impl BlockChain {
                                 Ok(_) => {
                                     bc.broadcast_head().await?;
                                     bc.print_state().await?;
+                                    if bc.showblocks {
+                                        bc.show_head().await?;
+                                    }
                                 },
                                 Err(_) => {println!("New block failed")}
                             }
@@ -401,6 +406,15 @@ impl BlockChain {
             },
             Err(_) => {println!("New block failed")}
         }
+        Ok(())
+    }
+    async fn show_head(&self) -> Result<()> {
+        let head = self.get_head().await.e()?;
+        if head.no_blocks() {
+            whatever!("No head to show");
+        }
+        let block = self.get_local_block(head.hash).await?;
+        ez_evaluate(&block.calc_seed(), &block.solution_bytes, 120);
         Ok(())
     }
 }

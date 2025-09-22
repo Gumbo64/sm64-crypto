@@ -1,2 +1,2 @@
 #!/bin/bash
-cd prod && ./main --mine
+cd prod && ./main --mine --showblocks

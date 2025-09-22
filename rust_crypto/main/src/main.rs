@@ -19,6 +19,9 @@ struct Args {
     /// Wait for a connection before starting
     #[clap(short, long, default_value_t = false)]
     nowait: bool,
+    // When we receive successful blocks, show them to the user
+    #[clap(short, long, default_value_t = false)]
+    showblocks: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -48,7 +51,7 @@ async fn main() -> Result<()> {
         r.store(false, Ordering::SeqCst);
     }).expect("Error setting Ctrl-C handler");
 
-    let bc = BlockChain::new(args.nowait).await?;
+    let bc = BlockChain::new(args.nowait, args.showblocks).await?;
 
     while running.load(Ordering::SeqCst) {
         if args.mine {
