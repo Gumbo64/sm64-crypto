@@ -263,8 +263,8 @@ fn distance(pos: &[f32; 3], goal: &[f32; 3]) -> f32 {
 }
 
 pub fn eval_metric(game: &SM64Game) -> bool {
-    // eval_metric_star(game)
-    eval_metric_bridge(game)
+    eval_metric_star(game)
+    // eval_metric_bridge(game)
 }
 
 pub fn eval_metric_star(game: &SM64Game) -> bool {

@@ -12,7 +12,7 @@ use snafu::whatever;
 
 mod use_exes;
 
-use use_exes::{record, ez_evaluate, remove_tmp_so_files};
+use use_exes::{record_loop, ez_evaluate, remove_tmp_so_files};
 use sha2::{Sha256, Digest};
 
 use distributed_topic_tracker::{AutoDiscoveryGossip, RecordPublisher, TopicId, GossipReceiver, GossipSender};
@@ -28,9 +28,6 @@ use iroh::protocol::Router;
 // use iroh_docs::{protocol::Docs};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-
-use crate::blockchain::use_exes::record_loop;
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BlockHead {
@@ -371,7 +368,7 @@ impl BlockChain {
                 Ok(_) => {
                     return;
                 },
-                Err(e) => {
+                Err(_e) => {
                     println!("Resetting the game so we're mining from the newest block");
                 }
             }
