@@ -1,2 +1,2 @@
 wsl --install Debian
-wsl --cd "%~dp0" -d Debian -e ./install.sh
+wsl --cd "%~dp0" -d Debian -e bash -c "cat install.sh | tr -d '\r' | bash"
