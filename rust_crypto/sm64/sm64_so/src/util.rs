@@ -169,7 +169,7 @@ impl StatefulInputGenerator {
     }
 
     pub fn get_iter(&mut self, game: &SM64Game) -> ((u16, i8, i8), bool) {
-        self.update_rng(game);
+        self.update_rng(game); // considers mario's position etc to change the seed
         if self.is_random_action() {
             let action = self.generate_action();
             return (action, true)
@@ -213,7 +213,6 @@ impl StatefulInputGenerator {
     }
 
     fn is_random_action(&mut self) -> bool {
-
         if self.rng_window_cur_amount == 0 {
             // Reset the window length and random action amount
             self.rng_window_cur_amount = self.rng_window_length_max;
