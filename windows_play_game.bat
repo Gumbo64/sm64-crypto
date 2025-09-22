@@ -1,1 +1,1 @@
-wsl --cd "%~dp0" -d Debian -e bash -c "cd prod && ./main --mine"
+wsl --cd "%~dp0" -d Debian -e bash -c "cat play_game.sh | tr -d '\r' | bash"
