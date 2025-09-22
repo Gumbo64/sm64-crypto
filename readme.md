@@ -6,30 +6,27 @@
 <!-- Fill in a brief summary of your project here. Describe its purpose, features, and any other relevant information. -->
 This project manages a blockchain (perhaps a cryptocurrency in future) where instead of mining, players play Mario 64 to create blocks. At the moment it has the sm64 mining/evaluating, the blockchain itself, networking, and consensus.
 
-## Usage
-To use the project, follow the installation, cd into `prod` and then run `./main` to see the commands
-
-
 ## Installation
 Before you begin, ensure you have the following:
 - **SM64 z64**: Ensure that you legally obtain a US copy of the game as a z64 file.
 
-The following instructions are based off the [sm64-port repository](https://www.github.com/sm64-port/sm64-port)
 
 ### Windows steps
 1. download this repository as zip
 2. extract it
-3. click and run `windows_install.bat`
-4. do what it says
-5. after it is done, click `windows_play_game.bat`
+3. Put your sm64 ROM into the root of the extracted folder, and call it `baserom.us.z64`
+4. click and run `windows_install.bat`
+5. do what it says
+6. after it is done, click `windows_play_game.bat`
 
 ### Linux steps
 
 1. download this repository as zip
 2. extract it
-3. right click and run `install.sh` (or cd into the root of the repository and run it in the terminal)
-4. do what it says
-5. after it is done, run `play_game.sh` to play
+3. Put your sm64 ROM into the root of the extracted folder, and call it `baserom.us.z64`
+4. right click and run `install.sh` (or cd into the root of the repository and run it in the terminal)
+5. do what it says
+6. after it is done, run `play_game.sh` to play
 
 
 ### Podman Desktop (no GUI or mining)
