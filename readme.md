@@ -2,6 +2,8 @@
 ## Summary
 This project manages a blockchain (perhaps a cryptocurrency in future) where instead of mining, players play Mario 64 to create blocks. At the moment it has the sm64 mining/evaluating, the blockchain itself, networking, and consensus.
 
+To mine a block, you must obtain 1 star. So you need to go to the top of bobomb battlefield's mountain and defeat king Bobomb
+
 ## Installation
 Before you begin, ensure you have the following:
 - **SM64 z64**: Ensure that you legally obtain a US copy of the game as a z64 file.
