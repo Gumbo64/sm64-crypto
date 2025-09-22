@@ -1,24 +1,6 @@
-
-
 # SM64 Crypto
-
 ## Summary
 This project manages a blockchain (perhaps a cryptocurrency in future) where instead of mining, players play Mario 64 to create blocks. At the moment it has the sm64 mining/evaluating, the blockchain itself, networking, and consensus.
-
-## Controls
-Keyboard button - N64 Button
-
-WASD - Joystick
-I - A
-J - B
-O - Z
-Enter - Start
-
-Special keys
-R - Go back ~4 seconds in the run
-Q - Completely restart run
-hold Space - Change to 0.1x Speed
-hold (Shift + Space) - Change to 10x Speed (or as fast as your computer can go)
 
 ## Installation
 Before you begin, ensure you have the following:
@@ -48,6 +30,20 @@ Before you begin, ensure you have the following:
 5. Click Build and wait for it to build
 6. Once it's done, go to Images and click the icon next to the sm64-crypto image that looks like a play button
 7. go to the bottom and click Start Container
+
+## Controls
+Keyboard button - N64 Button
+* WASD - Joystick
+* I - A
+* J - B
+* O - Z
+* Enter - Start
+
+Special keys
+* R - Go back ~4 seconds in the run
+* Q - Completely restart run
+* hold Space - Change to 0.1x Speed
+* hold (Shift + Space) - Change to 10x Speed (or as fast as your computer can go)
 
 
 ## Credits
