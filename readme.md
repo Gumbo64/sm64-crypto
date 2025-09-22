@@ -18,17 +18,20 @@ Before you begin, ensure you have the following:
 
 The following instructions are based off the [sm64-port repository](https://www.github.com/sm64-port/sm64-port)
 
-### Linux
+### Windows (WSL) pre-steps
+1. Run terminal as administrator and install WSL using `wsl --install`
+2. Open debian in WSL `wsl -d Debian`
 
-1. Install prerequisites (Ubuntu): `sudo apt install -y git build-essential pkg-config libusb-1.0-0-dev libsdl2-dev bsdmainutils`.
-2. Clone this repo which will create a directory and then cd into it.
+### Installation
+
+1. Clone/download this repo and then cd into it.
 <!-- 2. Clone the repo: `git clone https://github.com/sm64-port/sm64-port.git`, which will create a directory `sm64-port` and then **enter** it `cd sm64-port`. -->
-3. Place the sm64 z64 file renamed to `baserom.us.z64` into the repository's root directory.
-4. Run `make` to build.
-5. The executable binary will be located at `prod/main`
+2. Place the sm64 z64 file renamed to `baserom.us.z64` into the repository's root directory.
+3. Run `./install.sh` to install requirements and build the project.
+4. The executable binary will be located at `prod/main`
 
 
-### Podman Desktop (windows etc)
+### Podman Desktop (no GUI or mining)
 1. Put baserom.us.z64 in the root folder (next to readme.md etc)
 2. On podman desktop, go Containers -> Create -> Containerfile or Dockerfile (purple)
 3. Select Containerfile path by navigating to this folder, then selecting Dockerfile
