@@ -6,14 +6,18 @@ To mine a block, you must obtain 1 star. So you need to go to the top of bobomb 
 
 ## Installation
 Before you begin, ensure you have the following:
-- **SM64 z64**: Ensure that you legally obtain a US copy of the game as a z64 file.
+- **SM64 z64**: Ensure that you legally obtain a US copy of the game as a z64 file. It should be 8.00MB large
 
 ### Windows steps
+Make sure that HyperV and Virtualisation are on so that WSL can work. You may have to restart your computer when WSL is installed.
+You may have to install WSL manually if this install script fails.
+
 1. download this repository as zip
 2. extract it
 3. Put your sm64 ROM into the root of the extracted folder, and call it `baserom.us.z64`
 4. click and run `windows_install.bat`
-5. do what it says (it will take a while)
+5. do what it says (it will take a while). if you get coloured text after Debian installs then type `exit` and press enter to continue installation.
+  When rust is installing, press enter if you don't have rust or press 3 if you already have rust
 6. after it is done, click `windows_play_game.bat`
 
 ### Linux steps
@@ -22,6 +26,7 @@ Before you begin, ensure you have the following:
 3. Put your sm64 ROM into the root of the extracted folder, and call it `baserom.us.z64`
 4. right click and run `install.sh` (or cd into the root of the repository and run it in the terminal)
 5. do what it says (it will take a while)
+  When rust is installing, press enter if you don't have rust or press 3 if you already have rust
 6. after it is done, run `play_game.sh` to play
 
 ### Podman Desktop (no GUI or mining)
