@@ -6,12 +6,12 @@ Since gameplay *directly* seals blocks, it has many unique properties:
 * Only mined by humans at the moment, otherwise it could be an open-invite benchmark for AI
 * Produces a usable dataset of gameplay as the blockchain grows.
 
+To successfully finish your gameplay, you must obtain 1 star. Therefore you must to go to the top of bobomb battlefield's mountain and defeat King Bobomb.
+
 Unique problems require unique solutions, so some mechanisms have been invented:
 * While playing, your button inputs are randomly perturbed (like poking a robot) to prevent hard-coded or recycled gameplay.
 * The random seed is calculated based on the details of the block, so the RNG is verifiable and the gameplay is linked to the block
 * Instead of pre-computing all the random pertubations at the beginning, the RNG factors in Mario's current position and velocity after each frame of gameplay (unpredictable). This prevents players from abusing compute power to cherrypick hassle-free seeds.
-
-To successfully finish your gameplay, you must obtain 1 star. Therefore you must to go to the top of bobomb battlefield's mountain and defeat King Bobomb.
 
 Progress:
 - [x] Mario 64 integration: Playing and verifying
