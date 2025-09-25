@@ -1,8 +1,9 @@
 # SM64 Crypto
 ## Summary
-This project manages a blockchain (perhaps a cryptocurrency in future) where instead of mining, players play Mario 64 to create blocks. At the moment it has the sm64 mining/evaluating, the blockchain itself, networking, and consensus.
+Creating an independent cryptocurrency gained exclusively by playing Mario 64. Since gameplay *directly* seals blocks, there is no need for the initial investments, PVP or gas fees that other play-to-earn cryptos require. Even compared to normal cryptocurrencies it has many unique properties, such as how it is only mined by humans (at the moment) and produces a usable dataset of gameplay as the blockchain grows.
 
-To mine a block, you must obtain 1 star. So you need to go to the top of bobomb battlefield's mountain and defeat king Bobomb
+Functional at the moment is the sm64 playing/verifying, the blockchain itself (without transactions/wallets), networking, and consensus.
+To mine a block, you must obtain 1 star. So you need to go to the top of bobomb battlefield's mountain and defeat King Bobomb.
 
 ## Installation
 Before you begin, ensure you have the following:
