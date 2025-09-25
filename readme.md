@@ -18,7 +18,7 @@ Progress:
 - [x] Block creation, storage, chain
 - [x] P2P Networking, broadcasting blocks
 - [x] Consensus and syncing
-- [x] Calculating random seeds and input generation
+- [x] Calculating random seeds and random input generation
 - [ ] Wallets
 - [ ] Transactions
 
