@@ -1,9 +1,26 @@
 # SM64 Crypto
 ## Summary
-Creating an independent cryptocurrency gained exclusively by playing Mario 64. Since gameplay *directly* seals blocks, there is no need for the initial investments, PVP or gas fees that other play-to-earn cryptos require. Even compared to normal cryptocurrencies it has many unique properties, such as how it is only mined by humans (at the moment) and produces a usable dataset of gameplay as the blockchain grows.
+Creating an independent cryptocurrency gained exclusively by playing Mario 64. 
+Since gameplay *directly* seals blocks, it has many unique properties: 
+* No need for the initial investments, PVP or gas fees that required for other play-to-earn cryptos require
+* Only mined by humans at the moment, otherwise it could be an open-invite benchmark for AI
+* Produces a usable dataset of gameplay as the blockchain grows.
 
-Functional at the moment is the sm64 playing/verifying, the blockchain itself (without transactions/wallets), networking, and consensus.
-To mine a block, you must obtain 1 star. So you need to go to the top of bobomb battlefield's mountain and defeat King Bobomb.
+Unique problems require unique solutions, so some mechanisms have been invented:
+* While playing, your button inputs are randomly perturbed (like poking a robot) to prevent hard-coded or recycled gameplay.
+* The random seed is calculated based on the details of the block, so the RNG is verifiable and the gameplay is linked to the block
+* Instead of pre-computing all the random pertubations at the beginning, the RNG factors in Mario's current position and velocity after each frame of gameplay (unpredictable). This prevents players from abusing compute power to cherrypick hassle-free seeds.
+
+To successfully finish your gameplay, you must obtain 1 star. Therefore you must to go to the top of bobomb battlefield's mountain and defeat King Bobomb.
+
+Progress:
+- [x] Mario 64 integration: Playing and verifying
+- [x] Block creation, storage, chain
+- [x] P2P Networking, broadcasting blocks
+- [x] Consensus and syncing
+- [x] Calculating random seeds and input generation
+- [ ] Wallets
+- [ ] Transactions
 
 ## Installation
 Before you begin, ensure you have the following:
