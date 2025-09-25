@@ -22,6 +22,20 @@ Progress:
 - [ ] Wallets
 - [ ] Transactions
 
+## Controls
+Keyboard button - N64 Button
+* WASD - Joystick
+* I - A
+* J - B
+* O - Z
+* Enter - Start
+
+Special keys
+* R - Go back ~4 seconds in the run
+* Q - Completely restart run
+* hold Space - Change to 0.1x Speed
+* hold (Shift + Space) - Change to 10x Speed (or as fast as your computer can go)
+
 ## Installation
 Before you begin, ensure you have the following:
 - **SM64 z64**: Ensure that you legally obtain a US copy of the game as a z64 file. It should be 8.00MB large
@@ -55,21 +69,6 @@ You may have to install WSL manually if this install script fails.
 5. Click Build and wait for it to build
 6. Once it's done, go to Images and click the icon next to the sm64-crypto image that looks like a play button
 7. go to the bottom and click Start Container
-
-## Controls
-Keyboard button - N64 Button
-* WASD - Joystick
-* I - A
-* J - B
-* O - Z
-* Enter - Start
-
-Special keys
-* R - Go back ~4 seconds in the run
-* Q - Completely restart run
-* hold Space - Change to 0.1x Speed
-* hold (Shift + Space) - Change to 10x Speed (or as fast as your computer can go)
-
 
 ## Credits
 * Iroh
