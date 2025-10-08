@@ -482,9 +482,20 @@ impl Block {
         ez_evaluate(&self.calc_seed(), &self.solution_bytes.to_vec(), 0)
     }
     fn calc_seed(&self) -> String {
-        let combined = format!("{}{}", self.prev_hash, self.block_height);
         let mut hasher = Sha256::new();
-        hasher.update(combined);
+
+        let mut x = format!("{}", self.prev_hash);
+        hasher.update(x);
+
+        x = format!("{}", self.block_height);
+        hasher.update(x);
+
+        x = format!("{}", self.timestamp);
+        hasher.update(x);
+
+        x = format!("{:?}", self.miner_name);
+        hasher.update(x);
+
         let result = hasher.finalize();
         hex::encode(result) // Convert the hash to a hex string
     }
