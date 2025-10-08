@@ -63,7 +63,7 @@ fn set_config(held_keys: Vec<Keycode>, config: &mut Config) {
     }
 }
 
-pub fn record_replay(seed: &str, starting_bytes: Vec<u8>) -> (Vec<u8>, bool) {
+pub fn record_replay(seed: &str, starting_bytes: Vec<u8>, max_solution_bytes: usize) -> (Vec<u8>, bool) {
     let mut solution_bytes: Vec<u8> = starting_bytes.clone();
 
     let sm64_game = SM64Game::new(false).unwrap();
@@ -124,7 +124,7 @@ pub fn record_replay(seed: &str, starting_bytes: Vec<u8>) -> (Vec<u8>, bool) {
             break;
         }
 
-        if config.goback {
+        if config.goback || solution_bytes.len() > max_solution_bytes {
             let new_length = solution_bytes.len().saturating_sub(4 * config.goback_amount);
             solution_bytes.truncate(new_length);
             break;
@@ -152,13 +152,15 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     // Check if the expected number of arguments is provided
-    if args.len() < 3 {
-        eprintln!("Usage: {} <filename> <seed>", args[0]);
+    if args.len() < 4 {
+        eprintln!("Usage: {} <filename> <seed> <max_solution_bytes>", args[0]);
         std::process::exit(1);
     }
 
     let file_name: &String = &args[1];
     let seed: &str = &args[2];
+    let max_solution_bytes: usize = args[3].parse().expect("Failed to convert max_solution_bytes to u32");
+
 
     // Initialize starting_bytes as an empty vector
     let mut starting_bytes: Vec<u8> = Vec::new();
@@ -173,7 +175,7 @@ fn main() {
     }
 
     // Process the starting_bytes
-    let (solution_bytes, won) = record_replay(seed, starting_bytes);
+    let (solution_bytes, won) = record_replay(seed, starting_bytes, max_solution_bytes);
 
     // Write solution_bytes back to the same file
     let mut file = File::create(file_name).expect("Failed to create/open the file for writing");

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::time;
 
 mod blockchain;
-use blockchain::BlockChain;
+use blockchain::{BlockChain, MAX_NAME_LENGTH};
 
 
 #[derive(Parser, Debug)]
@@ -22,6 +22,8 @@ struct Args {
     // When we receive successful blocks, show them to the user
     #[clap(short, long, default_value_t = false)]
     showblocks: bool,
+    #[clap(short, long, default_value_t = String::from("Gumbo64"))]
+    miner_name: String,
 }
 
 #[derive(Parser, Debug)]
@@ -53,9 +55,16 @@ async fn main() -> Result<()> {
 
     let bc = BlockChain::new(args.nowait, args.showblocks).await?;
 
+    let mut miner_name: [u8; MAX_NAME_LENGTH] = [0; MAX_NAME_LENGTH];
+    let vec = args.miner_name;
+    assert!(vec.len() <= MAX_NAME_LENGTH);
+    let copy_length = vec.len().min(MAX_NAME_LENGTH);
+    miner_name[..copy_length].copy_from_slice(&vec.as_bytes()[..copy_length]);
+
+
     if args.mine {
         while running.load(Ordering::SeqCst) {
-            bc.mine().await;
+            bc.mine(miner_name).await;
         }
     } else {
         loop {

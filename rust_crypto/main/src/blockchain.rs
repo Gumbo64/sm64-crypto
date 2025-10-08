@@ -28,6 +28,7 @@ use iroh::protocol::Router;
 // use iroh_docs::{protocol::Docs};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use chrono::{DateTime, Local, Utc};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BlockHead {
@@ -193,7 +194,28 @@ impl BlockChain {
     pub async fn print_state(&self) -> Result<()> {
         let head = self.get_head().await?;
         if !head.no_blocks() {
-            println!("Current height: {}\nCurrent hash: {:?}", head.height, head.hash);
+            let head_block = self.get_local_block(head.hash).await?;
+
+            let name = match String::from_utf8(head_block.miner_name.to_vec()) {
+                Ok(string) => {
+                    let trim_str = string.trim_end_matches('\0').to_string();
+                    match trim_str.is_ascii() {
+                        true => {
+                            trim_str
+                        }
+                        false => {
+                            String::from("Unknown")
+                        }
+                    }
+                }
+                Err(_e) => {
+                    String::from("Unknown")
+                }
+            };
+            
+
+            let converted_timestamp: DateTime<Local> = DateTime::from(head_block.timestamp);
+            println!("Current height: {}\nCurrent hash: {:?}\nAt time: {:?}\nMined by: {:?}", head.height, head.hash, converted_timestamp, name);
         } else {
             println!("\n\nNEW CHAIN\n\n");
         }
@@ -367,9 +389,9 @@ impl BlockChain {
             Err(_) => whatever!("Request head fail") // Convert the error
         }
     }
-    pub async fn mine(&self) {
+    pub async fn mine(&self, miner_name: [u8; MAX_NAME_LENGTH]) {
         loop {
-            match self.mine_attempt().await {
+            match self.mine_attempt(miner_name).await {
                 Ok(_) => {
                     return;
                 },
@@ -379,7 +401,7 @@ impl BlockChain {
             }
         }
     }
-    async fn mine_attempt(&self) -> Result<()> {
+    async fn mine_attempt(&self, miner_name: [u8; MAX_NAME_LENGTH]) -> Result<()> {
         let mut _guard = self.db_lock.lock().await;
 
         {
@@ -392,7 +414,7 @@ impl BlockChain {
 
         // Mine a block. Release and then retake the lock after you finish playing
         drop(_guard);
-        let new_block = Block::new(head, self.new_block_signal.clone()).e()?;
+        let new_block = Block::new(head, self.new_block_signal.clone(), miner_name).e()?;
         _guard = self.db_lock.lock().await;
 
         // Add block to blobs
@@ -414,37 +436,50 @@ impl BlockChain {
             whatever!("No head to show");
         }
         let block = self.get_local_block(head.hash).await?;
-        ez_evaluate(&block.calc_seed(), &block.solution_bytes, 120);
+        ez_evaluate(&block.calc_seed(), &block.solution_bytes.to_vec(), 120);
         Ok(())
     }
 }
 
+
+// Bounded vec the solution_bytes soon
+const MAX_SOLUTION_TIME: usize = 600; // 600 seconds = 10 minutes
+const MAX_SOLUTION_BYTES: usize = MAX_SOLUTION_TIME * 30 * 4; // seconds * fps * (bytes per frame) 
+pub const MAX_NAME_LENGTH: usize = 64;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Block {
     prev_hash: Hash,
     block_height: u128,
-    solution_bytes: Vec<u8>,
+    timestamp: DateTime<Utc>,
+    // solution_bytes: Vec<u8>,
+
+    #[serde(with = "serde_arrays")]
+    miner_name: [u8; MAX_NAME_LENGTH],
+    #[serde(with = "serde_arrays")]
+    solution_bytes: [u8; MAX_SOLUTION_BYTES],
 }
 
 impl Block {
-    pub fn new(block_head: BlockHead, kill_signal: Arc<Mutex<bool>>) -> Result<Self> {
+    pub fn new(block_head: BlockHead, kill_signal: Arc<Mutex<bool>>, miner_name: [u8; MAX_NAME_LENGTH]) -> Result<Self> {
         let prev_hash = block_head.hash;
         let block_height = block_head.height.wrapping_add(1);
-
-        let seed = Block {prev_hash, block_height, solution_bytes: Vec::new() }.calc_seed();
-        // let solution_bytes = ez_record_loop(&seed);
-        // if solution_bytes.len() == 0 {
-            // whatever!("Failed to mine");
-        // }
         
-        let solution_bytes = record_loop(&seed, kill_signal)?;
+        let timestamp = Utc::now();
 
 
+        let mut solution_bytes: [u8; MAX_SOLUTION_BYTES] = [0; MAX_SOLUTION_BYTES];
+        let seed = Block {prev_hash, block_height, timestamp, miner_name, solution_bytes: solution_bytes.clone() }.calc_seed();
+         
+        let vec = record_loop(&seed, kill_signal)?;
+        assert!(vec.len() <= MAX_SOLUTION_BYTES);
 
-        Ok(Block { prev_hash, block_height, solution_bytes })
+        let copy_length = vec.len().min(MAX_SOLUTION_BYTES);
+        solution_bytes[..copy_length].copy_from_slice(&vec[..copy_length]);
+
+        Ok(Block {prev_hash, block_height, timestamp, miner_name, solution_bytes })
     }
     async fn evaluate_replay(&self) -> bool {
-        ez_evaluate(&self.calc_seed(), &self.solution_bytes, 0)
+        ez_evaluate(&self.calc_seed(), &self.solution_bytes.to_vec(), 0)
     }
     fn calc_seed(&self) -> String {
         let combined = format!("{}{}", self.prev_hash, self.block_height);

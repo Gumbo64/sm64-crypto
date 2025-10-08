@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use std::env;
 use std::io::{self, Read, Write};
-use std::fs::{File, OpenOptions};
+use std::fs::{File};
 
 pub fn evaluate_replay(seed: &str, solution_bytes: Vec<u8>, fps: u32) -> bool {
     let step_time = if fps > 0 { Duration::from_secs_f64(1.0 / fps as f64) } else { Duration::from_secs(0) };

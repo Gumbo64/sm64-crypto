@@ -25,7 +25,8 @@ pub fn ez_record(seed: &str, starting_bytes: &Vec<u8>) -> (Vec<u8>, bool) {
 
     let output = Command::new(record_command_path)
         .arg(filename)
-        .arg(seed)            
+        .arg(seed)     
+        .arg(MAX_SOLUTION_BYTES.to_string())       
         .stdout(std::process::Stdio::piped())
         .spawn().expect("").wait_with_output().expect("");
 
@@ -36,6 +37,7 @@ pub fn ez_record(seed: &str, starting_bytes: &Vec<u8>) -> (Vec<u8>, bool) {
     solution_bytes_pipe.read_to_end(&mut solution_bytes).expect("");
     (solution_bytes, won)
 }
+
 pub fn record(seed: &str, starting_bytes: &Vec<u8>, kill_signal: Arc<Mutex<bool>>) -> Result<(Vec<u8>, bool)> {
     // Locate sibling binaries (built in the same target dir as this binary)
     let exe_path = env::current_exe().expect("Failed to get current executable path");
@@ -53,6 +55,7 @@ pub fn record(seed: &str, starting_bytes: &Vec<u8>, kill_signal: Arc<Mutex<bool>
     let mut child = Command::new(record_command_path)
         .arg(filename)
         .arg(seed)            
+        .arg(MAX_SOLUTION_BYTES.to_string())       
         .stdout(std::process::Stdio::piped())
         .spawn().e()?;
 
@@ -154,6 +157,8 @@ pub fn ez_evaluate(seed: &str, solution_bytes: &Vec<u8>, fps: i8) -> bool {
 
 use std::fs;
 use std::path::Path;
+
+use crate::blockchain::MAX_SOLUTION_BYTES;
 pub fn remove_tmp_so_files<P: AsRef<Path>>(dir: P) -> io::Result<()> {
     let dir = dir.as_ref().join("tmp_so");
     if !dir.exists() {
