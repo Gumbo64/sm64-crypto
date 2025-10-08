@@ -36,13 +36,15 @@ Special keys
 * hold Space - Change to 0.1x Speed
 * hold (Shift + Space) - Change to 10x Speed (or as fast as your computer can go)
 
-## Executable options
+## ./main Executable options
 Options:
-  -m, --mine                     Enable mining
-  -n, --nowait                   Wait for a connection before starting
-  -s, --showblocks               
-  -m, --miner-name <MINER_NAME>  [default: Gumbo64]
-  -h, --help                     Print help
+*  -m, --mine                     Enable mining
+*  -n, --nowait                   Wait for a connection before starting
+*  -s, --showblocks               
+*  -m, --miner-name <MINER_NAME>  [default: Gumbo64]
+*  -h, --help                     Print help
+
+ie `./main --nowait --mine --miner-name "your name here"`
 
 ## Installation
 Before you begin, ensure you have the following:
