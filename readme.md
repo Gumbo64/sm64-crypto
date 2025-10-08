@@ -36,6 +36,14 @@ Special keys
 * hold Space - Change to 0.1x Speed
 * hold (Shift + Space) - Change to 10x Speed (or as fast as your computer can go)
 
+## Executable options
+Options:
+  -m, --mine                     Enable mining
+  -n, --nowait                   Wait for a connection before starting
+  -s, --showblocks               
+  -m, --miner-name <MINER_NAME>  [default: Gumbo64]
+  -h, --help                     Print help
+
 ## Installation
 Before you begin, ensure you have the following:
 - **SM64 z64**: Ensure that you legally obtain a US copy of the game as a z64 file. It should be 8.00MB large
@@ -50,7 +58,7 @@ You may have to install WSL manually if this install script fails.
 4. click and run `windows_install.bat`
 5. do what it says (it will take a while). if you get coloured text after Debian installs then type `exit` and press enter to continue installation.
   When rust is installing, press enter if you don't have rust or press 3 if you already have rust
-6. after it is done, click `windows_play_game.bat`
+6. after it is done, click `windows_play_game.bat` OR cd into `prod` and run `./main` using your chosen commands
 
 ### Linux steps
 1. download this repository as zip
@@ -59,7 +67,7 @@ You may have to install WSL manually if this install script fails.
 4. right click and run `install.sh` (or cd into the root of the repository and run it in the terminal)
 5. do what it says (it will take a while)
   When rust is installing, press enter if you don't have rust or press 3 if you already have rust
-6. after it is done, run `play_game.sh` to play
+6. after it is done, run `play_game.sh` to play OR cd into `prod` and run `./main` using your chosen commands
 
 ### Podman Desktop (no GUI or mining)
 1. Put baserom.us.z64 in the root folder (next to readme.md etc)
