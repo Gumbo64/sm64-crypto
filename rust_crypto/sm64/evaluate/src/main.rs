@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use std::env;
 use std::io::{self, Read, Write};
+use std::fs::{File, OpenOptions};
 
 pub fn evaluate_replay(seed: &str, solution_bytes: Vec<u8>, fps: u32) -> bool {
     let step_time = if fps > 0 { Duration::from_secs_f64(1.0 / fps as f64) } else { Duration::from_secs(0) };
@@ -51,25 +52,27 @@ pub fn evaluate_replay(seed: &str, solution_bytes: Vec<u8>, fps: u32) -> bool {
 }
 
 
-
 fn main() {
     // Collect command-line arguments
     let args: Vec<String> = env::args().collect();
 
     // Check if the expected number of arguments is provided
-    if args.len() < 3 {
-        eprintln!("Usage: {} <data>", args[0]);
+    if args.len() < 4 {
+        eprintln!("Usage: {} <filename> <seed> <fps>", args[0]);
         std::process::exit(1);
     }
+    // Open the specified file
+    let file_name: &String = &args[1];
+    let mut file = File::open(file_name).expect("Failed to open the file");
+    // The first argument is the seed and the second is the input file name
+    let seed: &String = &args[2];
+    let fps: u32 = args[3].parse().expect("Failed to convert fps to u32");
     
-    // The first argument is the program name, the second is the input data
-    let seed: &String = &args[1];
-    let fps: u32 = args[2].parse().expect("Failed to convert fps to u32");
-
+    // Read the contents of the file into a vector of bytes
     let mut solution_bytes: Vec<u8> = Vec::new();
-    io::stdin().read_to_end(&mut solution_bytes).expect("Failed to read data");
+    file.read_to_end(&mut solution_bytes).expect("Failed to read data from file");
 
-    let result = evaluate_replay(&seed, solution_bytes, fps); // "returns" true or false
+    let result = evaluate_replay(seed, solution_bytes, fps); // "returns" true or false
     let mut stdout = io::stdout();
     stdout.write_all(result.to_string().as_bytes()).expect("Failed to write to stdout");
 }

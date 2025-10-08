@@ -5,7 +5,7 @@ use n0_snafu::{Result, };
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-
+use tokio::time;
 
 mod blockchain;
 use blockchain::BlockChain;
@@ -53,11 +53,21 @@ async fn main() -> Result<()> {
 
     let bc = BlockChain::new(args.nowait, args.showblocks).await?;
 
-    while running.load(Ordering::SeqCst) {
-        if args.mine {
+    if args.mine {
+        while running.load(Ordering::SeqCst) {
             bc.mine().await;
         }
+    } else {
+        loop {
+            time::sleep(time::Duration::from_secs(1)).await;
+            // Check running state if needed
+            if !running.load(Ordering::SeqCst) {
+                break; // Exit the loop if running is false
+            }
+        }
     }
+
+    
 
     println!("Ending the program");
     Ok(())

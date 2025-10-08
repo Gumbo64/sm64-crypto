@@ -1,10 +1,12 @@
 use sm64_so::{buttons_to_int, eval_metric, Replay, SM64Game, StatefulInputGenerator};
 
 use device_query::{DeviceQuery, DeviceState, Keycode};
-use std::io::{self, Write, Read};
+use std::io::{self, Read, Write};
 use std::time::Instant;
 use std::time::Duration;
 use std::env;
+use std::fs::{File};
+use std::path::Path;
 
 struct Config {
     speed: f32,
@@ -143,26 +145,40 @@ pub fn record_replay(seed: &str, starting_bytes: Vec<u8>) -> (Vec<u8>, bool) {
     (solution_bytes, won)
 }
 
+
+
 fn main() {
     // Collect command-line arguments
     let args: Vec<String> = env::args().collect();
 
     // Check if the expected number of arguments is provided
-    if args.len() < 2 {
-        eprintln!("Usage: {} <data>", args[0]);
+    if args.len() < 3 {
+        eprintln!("Usage: {} <filename> <seed>", args[0]);
         std::process::exit(1);
     }
 
-    let seed: &str = &args[1];
+    let file_name: &String = &args[1];
+    let seed: &str = &args[2];
 
+    // Initialize starting_bytes as an empty vector
     let mut starting_bytes: Vec<u8> = Vec::new();
-    io::stdin().read_to_end(&mut starting_bytes).expect("Failed to read data");
 
-    let (solution_bytes, _won) = record_replay(seed, starting_bytes);
-    // if !won {
-    //     return;
-    // }
+    // Check if the specified file exists
+    if Path::new(file_name).exists() {
+        // Open the specified file
+        let mut file = File::open(file_name).expect("Failed to open the file");
+        
+        // Read the contents of the file into starting_bytes
+        file.read_to_end(&mut starting_bytes).expect("Failed to read data from file");
+    }
+
+    // Process the starting_bytes
+    let (solution_bytes, won) = record_replay(seed, starting_bytes);
+
+    // Write solution_bytes back to the same file
+    let mut file = File::create(file_name).expect("Failed to create/open the file for writing");
+    file.write_all(&solution_bytes).expect("Failed to write data to file");
 
     let mut stdout = io::stdout();
-    stdout.write_all(solution_bytes.as_slice()).expect("Failed to write to stdout");
+    stdout.write_all(won.to_string().as_bytes()).expect("Failed to write to stdout");
 }

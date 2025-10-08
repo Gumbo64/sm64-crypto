@@ -6,50 +6,55 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::thread;
 use std::time::Duration;
+use tempfile::NamedTempFile;
+use std::io::{self, Read, Write};
+use std::fs::File;
 
-
-pub fn ez_record(seed: &str, starting_bytes: &Vec<u8>) -> Vec<u8> {
+pub fn ez_record(seed: &str, starting_bytes: &Vec<u8>) -> (Vec<u8>, bool) {
     // Locate sibling binaries (built in the same target dir as this binary)
     let exe_path = env::current_exe().expect("Failed to get current executable path");
     let current_directory = exe_path.parent().expect("Failed to get parent directory");
     let record_command_path = current_directory.join("record");
+
+    let mut solution_bytes_pipe = NamedTempFile::new().expect("failed to make temp file");
+    let filename = solution_bytes_pipe.path();
+    {
+        let mut file = File::create(filename).expect("");
+        file.write_all(starting_bytes).expect("");
+    }
 
     let output = Command::new(record_command_path)
+        .arg(filename)
         .arg(seed)            
-        .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin.write_all(&starting_bytes)?;
-            }
-            child.wait_with_output()
-        })
-        .expect("Failed to execute command");
+        .spawn().expect("").wait_with_output().expect("");
 
-    output.stdout.clone()
+    let won: bool = &output.stdout == &"true".as_bytes().to_vec();
+
+    // Read back from the temp file
+    let mut solution_bytes = Vec::new();
+    solution_bytes_pipe.read_to_end(&mut solution_bytes).expect("");
+    (solution_bytes, won)
 }
-pub fn record(seed: &str, starting_bytes: &Vec<u8>, kill_signal: Arc<Mutex<bool>>) -> Result<Vec<u8>> {
+pub fn record(seed: &str, starting_bytes: &Vec<u8>, kill_signal: Arc<Mutex<bool>>) -> Result<(Vec<u8>, bool)> {
     // Locate sibling binaries (built in the same target dir as this binary)
     let exe_path = env::current_exe().expect("Failed to get current executable path");
     let current_directory = exe_path.parent().expect("Failed to get parent directory");
     let record_command_path = current_directory.join("record");
 
-    let mut child = Command::new(record_command_path)
-        .arg(seed)            
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            // take() means that child.stdin is dropped, which tells ./record that it doesn't have to wait for further input
-            if let Some(stdin) = child.stdin.take().as_mut() {
-                stdin.write_all(&starting_bytes)?;
-            }
-            Ok(child)
-        }).e()?;
+    let mut solution_bytes_pipe = NamedTempFile::new().expect("failed to make temp file");
+    let filename = solution_bytes_pipe.path();
+    {
+        let mut file = File::create(filename).expect("");
+        file.write_all(starting_bytes).expect("");
+    }
 
+
+    let mut child = Command::new(record_command_path)
+        .arg(filename)
+        .arg(seed)            
+        .stdout(std::process::Stdio::piped())
+        .spawn().e()?;
 
     // Loop to check for kill signal and child process status
     loop {
@@ -85,19 +90,23 @@ pub fn record(seed: &str, starting_bytes: &Vec<u8>, kill_signal: Arc<Mutex<bool>
         }
     }
 
-    // Collect the output after the child process has exited
     let output = child.wait_with_output().expect("Failed to execute command");
+    let won: bool = &output.stdout == &"true".as_bytes().to_vec();
 
-    Ok(output.stdout.clone())
+    // Read back from the temp file
+    let mut solution_bytes = Vec::new();
+    solution_bytes_pipe.read_to_end(&mut solution_bytes).e()?;
+    Ok((solution_bytes, won))
 }
 
 pub fn record_loop(seed: &str,  kill_signal: Arc<Mutex<bool>>) -> Result<Vec<u8>> {
     let mut solution_bytes: Vec<u8> = Vec::new();
     loop {
-        solution_bytes = record(seed, &solution_bytes.clone(), kill_signal.clone())?; // if the kill signal is used, then the ? activates
-        let success = ez_evaluate(seed, &solution_bytes.clone(), 0);
+        let won;
+        (solution_bytes, won) = record(seed, &solution_bytes.clone(), kill_signal.clone())?; // if the kill signal is used, then the ? activates
+        // let success = ez_evaluate(seed, &solution_bytes.clone(), 0);
 
-        if success {
+        if won {
             break;
         }
     }
@@ -107,10 +116,11 @@ pub fn record_loop(seed: &str,  kill_signal: Arc<Mutex<bool>>) -> Result<Vec<u8>
 pub fn ez_record_loop(seed: &str) -> Vec<u8> {
     let mut solution_bytes: Vec<u8> = Vec::new();
     loop {
-        solution_bytes = ez_record(seed, &solution_bytes.clone());
-        let success = ez_evaluate(seed, &solution_bytes.clone(), 0);
+        let won;
+        (solution_bytes, won) = ez_record(seed, &solution_bytes.clone());
+        // let success = ez_evaluate(seed, &solution_bytes.clone(), 0);
 
-        if success {
+        if won {
             break;
         }
     }
@@ -122,30 +132,27 @@ pub fn ez_evaluate(seed: &str, solution_bytes: &Vec<u8>, fps: i8) -> bool {
     let current_directory = exe_path.parent().expect("Failed to get parent directory");
     let evaluate_command_path = current_directory.join("evaluate");
 
-    // Spawn `evaluate`, pass seed and fps as args, and stream replay bytes via stdin
+    // Spawn `evaluate`, pass seed and fps as args
+
+    let solution_bytes_pipe = NamedTempFile::new().expect("failed to make temp file");
+    let filename = solution_bytes_pipe.path();
+    {
+        let mut file = File::create(filename).expect("");
+        file.write_all(solution_bytes).expect("");
+    }
+
     let output = Command::new(evaluate_command_path)
+            .arg(filename)
             .arg(seed)
             .arg(fps.to_string())
-            .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-            .spawn()
-            .and_then(|mut child| {
-                use std::io::Write;
-                // Pipe the recorded replay into `evaluate`'s stdin
-                if let Some(stdin) = child.stdin.as_mut() {
-                    stdin.write_all(&solution_bytes)?;
-                }
-                // Wait for `evaluate` to finish and capture its output
-                child.wait_with_output()
-            })
-            .expect("Failed to execute command");
+            .spawn().expect("Failed to execute command").wait_with_output().expect("");
 
     let success: bool = &output.stdout == &"true".as_bytes().to_vec();
     success
 }
 
 use std::fs;
-use std::io;
 use std::path::Path;
 pub fn remove_tmp_so_files<P: AsRef<Path>>(dir: P) -> io::Result<()> {
     let dir = dir.as_ref().join("tmp_so");
