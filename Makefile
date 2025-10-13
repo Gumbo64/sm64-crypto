@@ -13,8 +13,14 @@ all: copy-rom
 	$(MAKE) -C $(SM64PC) -j
 	$(MAKE) -C $(SM64PC) -j HEADLESS_VERSION=1
 
-	cp $(SM64PC)/build/us_pc_headless/sm64.us rust_crypto/sm64_headless.us
-	cp $(SM64PC)/build/us_pc/sm64.us rust_crypto/sm64.us
+	$(MAKE) -C $(SM64PC) -j TARGET_WEB=1
+	$(MAKE) -C $(SM64PC) -j TARGET_WEB=1 HEADLESS_VERSION=1
+
+
+# 	cp $(SM64PC)/build/us_pc_headless/sm64.us rust_crypto/sm64_headless.us
+# 	cp $(SM64PC)/build/us_pc/sm64.us rust_crypto/sm64.us
+	cp $(SM64PC)/build/us_web_headless/sm64.us.wasm rust_crypto/sm64_headless.us.wasm
+	cp $(SM64PC)/build/us_web/sm64.us.wasm rust_crypto/sm64.us.wasm
 
 	cd rust_crypto && cargo build --release
 
@@ -29,6 +35,9 @@ all: copy-rom
 
 	cp $(SM64PC)/build/us_pc_headless/sm64.us prod/sm64_headless.us
 	cp $(SM64PC)/build/us_pc/sm64.us prod/sm64.us
+	cp $(SM64PC)/build/us_web_headless/sm64.us.wasm prod/sm64_headless.us.wasm
+	cp $(SM64PC)/build/us_web/sm64.us.wasm prod/sm64.us.wasm
+
 
 	cp -r prod/* prod2
 

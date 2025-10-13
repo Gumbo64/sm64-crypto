@@ -16,3 +16,4 @@ prod
 prod2
 blockchain_data
 rom
+*.wasm

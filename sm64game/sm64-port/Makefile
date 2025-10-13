@@ -181,7 +181,9 @@ endif
 ifeq ($(TARGET_N64),0)
   OPT_FLAGS := -O2
   ifeq ($(TARGET_WEB),1)
-    OPT_FLAGS += -g4 --source-map-base http://localhost:8080/
+#     OPT_FLAGS += -gsource-map --source-map-base http://localhost:3000/ -sMODULARIZE=1 -sEXPORT_NAME="sm64lib"
+    OPT_FLAGS += -sMODULARIZE=1 -sEXPORT_NAME="sm64lib"
+
   endif
 endif
 
@@ -284,15 +286,15 @@ ifeq ($(TARGET_N64),1)
 else ifeq ($(TARGET_WEB),1)
   BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_web
 else
-  ifeq ($(HEADLESS_VERSION), 1)
-    BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_pc_headless
-  else
-    BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_pc
-  endif
+  BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_pc
+endif
+
+ifeq ($(HEADLESS_VERSION), 1)
+  BUILD_DIR := $(BUILD_DIR)_headless
 endif
 
 ifeq ($(TARGET_WEB),1)
-  EXE := $(BUILD_DIR)/$(TARGET).html
+  EXE := $(BUILD_DIR)/$(TARGET).wasm
 else ifeq ($(TARGET_WINDOWS),1)
   EXE := $(BUILD_DIR)/$(TARGET).exe
 else
@@ -450,12 +452,19 @@ CC_CHECK_CFLAGS := -fsyntax-only -fsigned-char $(CC_CFLAGS) $(TARGET_CFLAGS) -st
 # C compiler options
 CFLAGS = -G 0 $(OPT_FLAGS) $(TARGET_CFLAGS) $(MIPSISET) $(DEF_INC_CFLAGS)
 ifeq ($(COMPILER),gcc)
-  CFLAGS += -mno-shared -march=vr4300 -mfix4300 -mabi=32 -mhard-float -mdivide-breaks -fno-stack-protector -fno-common -fno-zero-initialized-in-bss -fno-PIC -mno-abicalls -fno-strict-aliasing -fno-inline-functions -ffreestanding -fwrapv -Wall -Wextra
+  CFLAGS += -mno-shared -mfix4300 -mabi=32 -mhard-float -mdivide-breaks -fno-stack-protector -fno-common -fno-zero-initialized-in-bss -fno-PIC -mno-abicalls -fno-strict-aliasing -fno-inline-functions -ffreestanding -fwrapv -Wall -Wextra
+  ifneq ($(TARGET_WEB),1)
+    CFLAGS += -march=vr4300
+  endif
 else
   CFLAGS += -non_shared -Wab,-r4300_mul -Xcpluscomm -Xfullwarn -signed -32
 endif
 
-ASFLAGS     := -march=vr4300 -mabi=32 $(foreach i,$(INCLUDE_DIRS),-I$(i)) $(foreach d,$(DEFINES),--defsym $(d))
+ASFLAGS     := mabi=32 $(foreach i,$(INCLUDE_DIRS),-I$(i)) $(foreach d,$(DEFINES),--defsym $(d))
+ifneq ($(TARGET_WEB),1)
+  ASFLAGS += -march=vr4300
+endif
+
 RSPASMFLAGS := $(foreach d,$(DEFINES),-definelabel $(subst =, ,$(d)))
 
 ifeq ($(shell getconf LONG_BIT), 32)
@@ -477,6 +486,7 @@ ifneq ($(TARGET_WEB),1)
   CXX := g++
 else
   CC := emcc
+  CXX := emcc
 endif
 ifeq ($(CXX_FILES),"")
   LD := $(CC)
@@ -498,7 +508,10 @@ ifeq ($(TARGET_LINUX),1)
 endif
 ifeq ($(TARGET_WEB),1)
   PLATFORM_CFLAGS  := -DTARGET_WEB -shared -fPIC
-  PLATFORM_LDFLAGS := -lm -no-pie -s TOTAL_MEMORY=20MB -g4 --source-map-base http://localhost:8080/ -s "EXTRA_EXPORTED_RUNTIME_METHODS=['callMain']"
+#   PLATFORM_LDFLAGS := -lm -no-pie -s TOTAL_MEMORY=20MB -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_FUNCTIONS=_main_func,_step_game,_get_mario_state,_get_game_info,_get_lakitu_pos,_get_lakitu_yaw,_end
+  PLATFORM_LDFLAGS := -lm -no-pie -s TOTAL_MEMORY=20MB -sMODULARIZE=1 -sEXPORT_NAME="sm64lib" -sEXPORTED_FUNCTIONS=_main_func,_step_game,_get_mario_state,_get_game_info,_get_lakitu_pos,_get_lakitu_yaw,_end
+
+#   -sEXPORTED_RUNTIME_METHODS=callMain
 endif
 
 PLATFORM_CFLAGS += -DNO_SEGMENTED_MEMORY -DUSE_SYSTEM_MALLOC
@@ -532,7 +545,10 @@ endif
 GFX_CFLAGS += -DWIDESCREEN
 
 CC_CHECK := $(CC) -fsyntax-only -fsigned-char -Wall -Wextra -Wno-format-security -D_LANGUAGE_C $(DEF_INC_CFLAGS) $(PLATFORM_CFLAGS) $(GFX_CFLAGS)
-CFLAGS := $(OPT_FLAGS) -D_LANGUAGE_C $(DEF_INC_CFLAGS) $(PLATFORM_CFLAGS) $(GFX_CFLAGS) -fno-strict-aliasing -fwrapv -march=native -shared -lm -fPIC
+CFLAGS := $(OPT_FLAGS) -D_LANGUAGE_C $(DEF_INC_CFLAGS) $(PLATFORM_CFLAGS) $(GFX_CFLAGS) -fno-strict-aliasing -fwrapv -shared -lm -fPIC
+ifneq ($(TARGET_WEB),1)
+  CFLAGS += -march=native
+endif
 
 ASFLAGS := -I include -I $(BUILD_DIR) $(foreach d,$(DEFINES),--defsym $(d))
 
