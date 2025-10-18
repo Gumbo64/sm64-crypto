@@ -180,11 +180,11 @@ endif
 # OPT_FLAGS - for ports
 ifeq ($(TARGET_N64),0)
   OPT_FLAGS := -O2
-  ifeq ($(TARGET_WEB),1)
-#     OPT_FLAGS += -gsource-map --source-map-base http://localhost:3000/ -sMODULARIZE=1 -sEXPORT_NAME="sm64lib"
-    OPT_FLAGS += -sMODULARIZE=1 -sEXPORT_NAME="sm64lib"
+#   ifeq ($(TARGET_WEB),1)
+# #     OPT_FLAGS += -gsource-map --source-map-base http://localhost:3000/ -sMODULARIZE=1 -sEXPORT_NAME="sm64lib"
+#     OPT_FLAGS += -sMODULARIZE=1 -sEXPORT_NAME="sm64lib"
 
-  endif
+#   endif
 endif
 
 
@@ -294,7 +294,7 @@ ifeq ($(HEADLESS_VERSION), 1)
 endif
 
 ifeq ($(TARGET_WEB),1)
-  EXE := $(BUILD_DIR)/$(TARGET).wasm
+  EXE := $(BUILD_DIR)/$(TARGET).html
 else ifeq ($(TARGET_WINDOWS),1)
   EXE := $(BUILD_DIR)/$(TARGET).exe
 else
@@ -452,18 +452,13 @@ CC_CHECK_CFLAGS := -fsyntax-only -fsigned-char $(CC_CFLAGS) $(TARGET_CFLAGS) -st
 # C compiler options
 CFLAGS = -G 0 $(OPT_FLAGS) $(TARGET_CFLAGS) $(MIPSISET) $(DEF_INC_CFLAGS)
 ifeq ($(COMPILER),gcc)
-  CFLAGS += -mno-shared -mfix4300 -mabi=32 -mhard-float -mdivide-breaks -fno-stack-protector -fno-common -fno-zero-initialized-in-bss -fno-PIC -mno-abicalls -fno-strict-aliasing -fno-inline-functions -ffreestanding -fwrapv -Wall -Wextra
-  ifneq ($(TARGET_WEB),1)
-    CFLAGS += -march=vr4300
-  endif
+  CFLAGS += -march=vr4300 -mno-shared -mfix4300 -mabi=32 -mhard-float -mdivide-breaks -fno-stack-protector -fno-common -fno-zero-initialized-in-bss -fno-PIC -mno-abicalls -fno-strict-aliasing -fno-inline-functions -ffreestanding -fwrapv -Wall -Wextra
 else
   CFLAGS += -non_shared -Wab,-r4300_mul -Xcpluscomm -Xfullwarn -signed -32
 endif
 
-ASFLAGS     := mabi=32 $(foreach i,$(INCLUDE_DIRS),-I$(i)) $(foreach d,$(DEFINES),--defsym $(d))
-ifneq ($(TARGET_WEB),1)
-  ASFLAGS += -march=vr4300
-endif
+ASFLAGS     := -march=vr4300 mabi=32 $(foreach i,$(INCLUDE_DIRS),-I$(i)) $(foreach d,$(DEFINES),--defsym $(d))
+
 
 RSPASMFLAGS := $(foreach d,$(DEFINES),-definelabel $(subst =, ,$(d)))
 
@@ -486,7 +481,7 @@ ifneq ($(TARGET_WEB),1)
   CXX := g++
 else
   CC := emcc
-  CXX := emcc
+  CXX := em++
 endif
 ifeq ($(CXX_FILES),"")
   LD := $(CC)
@@ -507,9 +502,10 @@ ifeq ($(TARGET_LINUX),1)
   PLATFORM_LDFLAGS := -lm -lpthread `pkg-config --libs libusb-1.0` -lasound -lpulse -no-pie
 endif
 ifeq ($(TARGET_WEB),1)
-  PLATFORM_CFLAGS  := -DTARGET_WEB -shared -fPIC
+
+  PLATFORM_CFLAGS  := -shared -fPIC -DTARGET_WEB
 #   PLATFORM_LDFLAGS := -lm -no-pie -s TOTAL_MEMORY=20MB -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_FUNCTIONS=_main_func,_step_game,_get_mario_state,_get_game_info,_get_lakitu_pos,_get_lakitu_yaw,_end
-  PLATFORM_LDFLAGS := -lm -no-pie -s TOTAL_MEMORY=20MB -sMODULARIZE=1 -sEXPORT_NAME="sm64lib" -sEXPORTED_FUNCTIONS=_main_func,_step_game,_get_mario_state,_get_game_info,_get_lakitu_pos,_get_lakitu_yaw,_end
+  PLATFORM_LDFLAGS := -lm -no-pie -sALLOW_MEMORY_GROWTH -sTOTAL_MEMORY=20MB -sFULL_ES2 -sFULL_ES3 -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_FUNCTIONS=_main,_main_func,_step_game,_get_mario_state,_get_game_info,_get_lakitu_pos,_get_lakitu_yaw,_end -sEXPORTED_RUNTIME_METHODS=callMain
 
 #   -sEXPORTED_RUNTIME_METHODS=callMain
 endif
