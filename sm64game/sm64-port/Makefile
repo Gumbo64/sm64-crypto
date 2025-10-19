@@ -503,11 +503,11 @@ ifeq ($(TARGET_LINUX),1)
 endif
 ifeq ($(TARGET_WEB),1)
 
-  PLATFORM_CFLAGS  := -shared -fPIC -DTARGET_WEB
+  PLATFORM_CFLAGS  := -DTARGET_WEB -fPIC
 #   PLATFORM_LDFLAGS := -lm -no-pie -s TOTAL_MEMORY=20MB -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_FUNCTIONS=_main_func,_step_game,_get_mario_state,_get_game_info,_get_lakitu_pos,_get_lakitu_yaw,_end
-  PLATFORM_LDFLAGS := -lm -no-pie -sALLOW_MEMORY_GROWTH -sTOTAL_MEMORY=20MB -sFULL_ES2 -sFULL_ES3 -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_FUNCTIONS=_main,_main_func,_step_game,_get_mario_state,_get_game_info,_get_lakitu_pos,_get_lakitu_yaw,_end -sEXPORTED_RUNTIME_METHODS=callMain
+  PLATFORM_LDFLAGS := -lm -no-pie -sUSE_SDL=2  -sTOTAL_MEMORY=20MB -sFULL_ES2 -sFULL_ES3 -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_FUNCTIONS=_main
 
-#   -sEXPORTED_RUNTIME_METHODS=callMain
+#   -sEXPORTED_RUNTIME_METHODS=callMain -sALLOW_MEMORY_GROWTH
 endif
 
 PLATFORM_CFLAGS += -DNO_SEGMENTED_MEMORY -DUSE_SYSTEM_MALLOC
@@ -526,7 +526,7 @@ ifeq ($(ENABLE_OPENGL),1)
   endif
   ifeq ($(TARGET_WEB),1)
     GFX_CFLAGS  += -s USE_SDL=2
-    GFX_LDFLAGS += -lGL -lSDL2
+    GFX_LDFLAGS += -lGL
   endif
 endif
 ifeq ($(ENABLE_DX11),1)
@@ -541,14 +541,14 @@ endif
 GFX_CFLAGS += -DWIDESCREEN
 
 CC_CHECK := $(CC) -fsyntax-only -fsigned-char -Wall -Wextra -Wno-format-security -D_LANGUAGE_C $(DEF_INC_CFLAGS) $(PLATFORM_CFLAGS) $(GFX_CFLAGS)
-CFLAGS := $(OPT_FLAGS) -D_LANGUAGE_C $(DEF_INC_CFLAGS) $(PLATFORM_CFLAGS) $(GFX_CFLAGS) -fno-strict-aliasing -fwrapv -shared -lm -fPIC
+CFLAGS := $(OPT_FLAGS) -D_LANGUAGE_C $(DEF_INC_CFLAGS) $(PLATFORM_CFLAGS) $(GFX_CFLAGS) -fno-strict-aliasing -fwrapv
 ifneq ($(TARGET_WEB),1)
   CFLAGS += -march=native
 endif
 
 ASFLAGS := -I include -I $(BUILD_DIR) $(foreach d,$(DEFINES),--defsym $(d))
 
-LDFLAGS := $(PLATFORM_LDFLAGS) $(GFX_LDFLAGS) -shared -lm -fPIC
+LDFLAGS := $(PLATFORM_LDFLAGS) $(GFX_LDFLAGS)
 
 endif
 

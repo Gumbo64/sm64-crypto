@@ -553,7 +553,7 @@ void read_controller_inputs(void) {
     // If any controllers are plugged in, update the controller information.
     if (gControllerBits) {
         osRecvMesg(&gSIEventMesgQueue, &gMainReceivedMesg, OS_MESG_BLOCK);
-        // osContGetReadData(&gControllerPads[0]);
+        osContGetReadData(&gControllerPads[0]);
 #if ENABLE_RUMBLE
         release_rumble_pak_control();
 #endif
@@ -719,12 +719,12 @@ void game_loop_one_iteration(void) {
 
         // If any controllers are plugged in, start read the data for when
         // read_controller_inputs is called later.
-//         if (gControllerBits) {
-// #if ENABLE_RUMBLE
-//             block_until_rumble_pak_free();
-// #endif
-//             osContStartReadData(&gSIEventMesgQueue);
-//         }
+        if (gControllerBits) {
+#if ENABLE_RUMBLE
+            block_until_rumble_pak_free();
+#endif
+            osContStartReadData(&gSIEventMesgQueue);
+        }
 
         audio_game_loop_tick();
         select_gfx_pool();

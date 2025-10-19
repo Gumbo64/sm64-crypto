@@ -1,4 +1,6 @@
+#include <stdint.h>
 #include <stdlib.h>
+#include <sys/types.h>
 
 #ifdef TARGET_WEB
 #include <emscripten.h>
@@ -58,6 +60,8 @@ void dispatch_audio_sptask(UNUSED struct SPTask *spTask) {
 void set_vblank_handler(UNUSED s32 index, UNUSED struct VblankHandler *handler, UNUSED OSMesgQueue *queue, UNUSED OSMesg *msg) {
 }
 
+
+
 static uint8_t inited = 0;
 
 #include "game/game_init.h" // for gGlobalTimer
@@ -98,6 +102,56 @@ void produce_one_frame(void) {
     
     gfx_end_frame();
 }
+#include "game/level_update.h"
+#include "game/camera.h"
+bool has_won() {
+    return gMarioState->numStars > 0;
+}
+#include "controller/controller_recorded_tas.h"
+
+#ifndef TARGET_WEB
+#include <time.h>
+#endif
+#include <string.h>
+
+
+unsigned long simple_hash(const char *str) {
+    unsigned long hash = 5381;
+    int c;
+
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c; // hash * 33 + c
+    }
+    
+    return hash;
+}
+
+void update_seed() {
+    rng_update(rng_next() ^ (uint32_t)gMarioState->pos[0]);
+    rng_update(rng_next() ^ (uint32_t)gMarioState->pos[1]);
+    rng_update(rng_next() ^ (uint32_t)gMarioState->pos[2]);
+    rng_update(rng_next() ^ (uint32_t)gMarioState->vel[0]);
+    rng_update(rng_next() ^ (uint32_t)gMarioState->vel[1]);
+    rng_update(rng_next() ^ (uint32_t)gMarioState->vel[2]);
+    
+    rng_update(rng_next());
+}
+
+void main_loop() {
+    // #ifndef TARGET_WEB
+    struct timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 33333333 / get_speed();
+    nanosleep(&ts, &ts);
+    // #endif
+
+    update_seed();
+
+    produce_one_frame();
+    if (has_won()) {
+        exit(0);
+    }
+}
 
 #ifdef TARGET_WEB
 static void em_main_loop(void) {
@@ -112,7 +166,7 @@ static void request_anim_frame(void (*func)(double time)) {
 static void on_anim_frame(double time) {
     static double target_time;
 
-    time *= 0.03; // milliseconds to frame count (33.333 ms -> 1)
+    time *= 0.03 / get_speed(); // milliseconds to frame count (33.333 ms -> 1)
 
     if (time >= target_time + 10.0) {
         // We are lagging 10 frames behind, probably due to coming back after inactivity,
@@ -123,7 +177,7 @@ static void on_anim_frame(double time) {
     for (int i = 0; i < 2; i++) {
         // If refresh rate is 15 Hz or something we might need to generate two frames
         if (time >= target_time) {
-            produce_one_frame();
+            main_loop();
             target_time = target_time + 1.0;
         }
     }
@@ -140,7 +194,8 @@ static void on_fullscreen_changed(bool is_now_fullscreen) {
     configFullscreen = is_now_fullscreen;
 }
 
-void main_func(int start_in_foreground) {
+#include <stdio.h>
+void main_func(uint32_t seed, char filename[FILENAME_MAX], int record_mode, int start_in_foreground) {
 #ifdef USE_SYSTEM_MALLOC
     main_pool_init();
     gGfxAllocOnlyPool = alloc_only_pool_init();
@@ -151,11 +206,13 @@ void main_func(int start_in_foreground) {
     gEffectsMemoryPool = mem_pool_init(0x4000, MEMORY_POOL_LEFT);
 
     // configfile_load(CONFIG_FILE);
-    // atexit(save_config);
+    atexit(save_config);
 
 #ifdef TARGET_WEB
-    emscripten_set_main_loop(em_main_loop, 0, 0);
-    request_anim_frame(on_anim_frame);
+    // emscripten_set_main_loop(em_main_loop, 0, 0);
+    // request_anim_frame(on_anim_frame);
+    emscripten_cancel_main_loop();
+    emscripten_set_main_loop(main_loop,0,0);
 #endif
 
 #if defined(HEADLESS_VERSION)
@@ -215,6 +272,9 @@ void main_func(int start_in_foreground) {
     sound_init();
 
     thread5_game_loop(NULL);
+
+    true_tas_init(filename, record_mode, seed);
+
 #ifdef TARGET_WEB
     /*for (int i = 0; i < atoi(argv[1]); i++) {
         game_loop_one_iteration();
@@ -222,24 +282,46 @@ void main_func(int start_in_foreground) {
     inited = 1;
 #else
     inited = 1;
-    // while (1) {
-    //     wm_api->main_loop(produce_one_frame);
-    // }
+    while (1) {
+        wm_api->main_loop(main_loop);
+    }
 #endif
 }
 
-#if defined(_WIN32) || defined(_WIN64)
-#include <windows.h>
-int WINAPI WinMain(UNUSED HINSTANCE hInstance, UNUSED HINSTANCE hPrevInstance, UNUSED LPSTR pCmdLine, UNUSED int nCmdShow) {
-    main_func(1);
+// #if defined(_WIN32) || defined(_WIN64)
+// #include <windows.h>
+// int WINAPI WinMain(UNUSED HINSTANCE hInstance, UNUSED HINSTANCE hPrevInstance, UNUSED LPSTR pCmdLine, UNUSED int nCmdShow) {
+//     main_func(1);
+//     return 0;
+// }
+// #else
+int main(int argc, char *argv[]) {
+    if (argc < 4) {
+        fprintf(stderr, "Usage: %s <seed> <filename> <record_mode>\n", argv[0]);
+        return 1;
+    }
+
+    // Use the first command-line argument as the seed
+    uint32_t seed = (uint32_t)strtoul(argv[1], NULL, 10);
+
+    // Convert filename to char[FILENAME_MAX]
+    char filename[FILENAME_MAX];
+    strncpy(filename, argv[2], FILENAME_MAX);
+    // filename[FILENAME_MAX - 1] = '\0'; // Ensure null termination
+
+    // Convert record_mode from string to integer (1 or 0)
+    int record_mode = atoi(argv[3]);
+    if (record_mode != 0 && record_mode != 1) {
+        fprintf(stderr, "Error: record_mode must be 0 or 1\n");
+        return 1;
+    }
+
+    // Call main_func with the filename and record_mode
+    main_func(seed, filename, record_mode, 1);
+
     return 0;
 }
-#else
-int main(UNUSED int argc, UNUSED char *argv[]) {
-    main_func(1);
-    return 0;
-}
-#endif
+// #endif
 
 // #include "controller/controller.h"
 
@@ -253,6 +335,7 @@ void set_controller(int stickX, int stickY, int button) {
     // keyboard_on_key_down, keyboard_on_key_up, keyboard_on_all_keys_up
     controller->button = button;
 }
+
 
 
 void step_game(int steps, int stickX, int stickY, int button) {
@@ -280,8 +363,7 @@ void end(void) {
     exit(0);
 }
 
-#include "game/level_update.h"
-#include "game/camera.h"
+
 
 struct MarioState *get_mario_state() {
     return gMarioState;
