@@ -134,46 +134,37 @@ void main_loop() {
         exit_game(0);
     }
 
-    #ifndef TARGET_WEB
+    // #ifndef TARGET_WEB
     struct timespec ts;
     ts.tv_sec = 0;
     ts.tv_nsec = 33333333 / get_speed();
     nanosleep(&ts, &ts);
-    #endif
+    // #endif
 }
 
 #ifdef TARGET_WEB
 static void em_main_loop(void) {
-    main_loop();
+    // main_loop();
 }
 
-// static void request_anim_frame(void (*func)(double time)) {
-//     EM_ASM(requestAnimationFrame(function(time) {
-//         dynCall("vd", $0, [time]);
-//     }), func);
-// }
+static void request_anim_frame(void (*func)(double time)) {
+    EM_ASM(MainLoop.requestAnimationFrame(function(time) {
+        dynCall("vd", $0, [time]);
+    }), func);
 
-// static void on_anim_frame(double time) {
-//     static double target_time;
+    // EM_ASM(setTimeout(function() {
+    //     dynCall("vd", $0, [Date.now()]);
+    // }, 10), func);
 
-//     time *= 0.03; // milliseconds to frame count (33.333 ms -> 1)
+}
 
-//     if (time >= target_time + 10.0) {
-//         // We are lagging 10 frames behind, probably due to coming back after inactivity,
-//         // so reset, with a small margin to avoid potential jitter later.
-//         target_time = time - 0.010;
-//     }
-
-//     for (int i = 0; i < 2; i++) {
-//         // If refresh rate is 15 Hz or something we might need to generate two frames
-//         if (time >= target_time) {
-//             main_loop();
-//             target_time = target_time + 1.0 / get_speed();
-//         }
-//     }
-//     printf()
-//     request_anim_frame(on_anim_frame);
-// }
+static void on_anim_frame(double time) {
+    static double last_time = 0;
+    main_loop();
+    // printf("%f\n", time - last_time);
+    last_time = time;
+    request_anim_frame(on_anim_frame);
+}
 #endif
 
 static void save_config(void) {
@@ -200,7 +191,7 @@ void main_func(uint32_t seed, char filename[FILENAME_MAX], int record_mode, int 
 
 #ifdef TARGET_WEB
     emscripten_set_main_loop(em_main_loop, 0, 0);
-    // request_anim_frame(on_anim_frame);
+    request_anim_frame(on_anim_frame);
 #endif
 
 #if defined(HEADLESS_VERSION)

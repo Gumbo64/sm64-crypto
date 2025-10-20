@@ -10,40 +10,35 @@ PROD = prod
 # Define the target that will copy the ROM file and call the Makefile in SM64PC
 all: copy-rom
 	@echo "Calling Makefile in $(SM64PC)..."
-	$(MAKE) -C $(SM64PC) -j
-	$(MAKE) -C $(SM64PC) -j HEADLESS_VERSION=1
 
+
+# 	WEB BUILDING
 	$(MAKE) -C $(SM64PC) -j TARGET_WEB=1
 	$(MAKE) -C $(SM64PC) -j TARGET_WEB=1 HEADLESS_VERSION=1
+	cp $(SM64PC)/build/us_web_headless/sm64.us.wasm frontend/pkg/sm64_headless.us.wasm
+	cp $(SM64PC)/build/us_web_headless/sm64.us.js frontend/pkg/sm64_headless.us.js
+	cp $(SM64PC)/build/us_web/sm64.us.wasm frontend/pkg/sm64.us.wasm
+	cp $(SM64PC)/build/us_web/sm64.us.js frontend/pkg/sm64.us.js
 
-
-# 	cp $(SM64PC)/build/us_pc_headless/sm64.us rust_crypto/sm64_headless.us
-# 	cp $(SM64PC)/build/us_pc/sm64.us rust_crypto/sm64.us
+#   CLI BUILDING
+	$(MAKE) -C $(SM64PC) -j
+	$(MAKE) -C $(SM64PC) -j HEADLESS_VERSION=1
 	cp $(SM64PC)/build/us_web_headless/sm64.us.wasm rust_crypto/sm64_headless.us.wasm
 	cp $(SM64PC)/build/us_web/sm64.us.wasm rust_crypto/sm64.us.wasm
 
 	cd rust_crypto && cargo build --release
+	mkdir -p $(PROD)
 
-# 	rm -r prod
-# 	rm -r prod2
-
-	mkdir -p prod
-	mkdir -p prod2
 	cp $(RELEASE)/main $(PROD)/main
 	cp $(RELEASE)/evaluate $(PROD)/evaluate
 	cp $(RELEASE)/record $(PROD)/record
 
-	cp $(SM64PC)/build/us_pc_headless/sm64.us prod/sm64_headless.us
-	cp $(SM64PC)/build/us_pc/sm64.us prod/sm64.us
+	cp $(SM64PC)/build/us_pc_headless/sm64.us $(PROD)/sm64_headless.us
+	cp $(SM64PC)/build/us_pc/sm64.us $(PROD)/sm64.us
 
 	
-	cp $(SM64PC)/build/us_web_headless/sm64.us.wasm frontend/pkg/sm64_headless.us.wasm
-	cp $(SM64PC)/build/us_web_headless/sm64.us.js frontend/pkg/sm64_headless.us.js
-
-	cp $(SM64PC)/build/us_web/sm64.us.wasm frontend/pkg/sm64.us.wasm
-	cp $(SM64PC)/build/us_web/sm64.us.js frontend/pkg/sm64.us.js
-
-	cp -r prod/* prod2
+	mkdir -p $(PROD)2
+	cp -r $(PROD)/* $(PROD)2
 
 
 # Define a target to copy the ROM file into the SM64PC

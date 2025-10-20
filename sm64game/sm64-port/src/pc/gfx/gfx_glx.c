@@ -18,11 +18,6 @@
 #include "gfx_window_manager_api.h"
 #include "gfx_screen_config.h"
 
-#ifdef TARGET_WEB
-#include <emscripten.h>
-#include <emscripten/html5.h>
-#endif
-
 #define GFX_API_NAME "GLX - OpenGL"
 
 #ifdef VERSION_EU

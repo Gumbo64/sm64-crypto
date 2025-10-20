@@ -505,7 +505,7 @@ ifeq ($(TARGET_WEB),1)
 
   PLATFORM_CFLAGS  := -DTARGET_WEB -fPIC
 #   PLATFORM_LDFLAGS := -lm -no-pie -s TOTAL_MEMORY=20MB -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_FUNCTIONS=_main_func,_step_game,_get_mario_state,_get_game_info,_get_lakitu_pos,_get_lakitu_yaw,_end
-  PLATFORM_LDFLAGS := -lm -no-pie -sUSE_SDL=2 -sMODULARIZE -sTOTAL_MEMORY=20MB -sINVOKE_RUN=0 -sNO_EXIT_RUNTIME=0 -sFULL_ES2 -sFULL_ES3 -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_RUNTIME_METHODS=callMain,abort,FS,setCanvasSize
+  PLATFORM_LDFLAGS := -lm -no-pie -sUSE_SDL=2 -sMODULARIZE -sTOTAL_MEMORY=20MB -sINVOKE_RUN=0 -sNO_EXIT_RUNTIME=0 -sFULL_ES2 -sFULL_ES3 -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_RUNTIME_METHODS=callMain,abort,FS
   ifeq ($(HEADLESS_VERSION), 1)
     PLATFORM_LDFLAGS += -sEXPORT_NAME=SM64_HEADLESS
   else

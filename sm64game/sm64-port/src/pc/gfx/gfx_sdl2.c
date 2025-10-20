@@ -138,18 +138,18 @@ int test_vsync(void) {
 
     float average = 4.0 * 1000.0 / (end - start);
 
-    vsync_enabled = 1;
-    if (average > 27 && average < 33) {
-        SDL_GL_SetSwapInterval(1);
-    } else if (average > 57 && average < 63) {
-        SDL_GL_SetSwapInterval(2);
-    } else if (average > 86 && average < 94) {
-        SDL_GL_SetSwapInterval(3);
-    } else if (average > 115 && average < 125) {
-        SDL_GL_SetSwapInterval(4);
-    } else {
-        vsync_enabled = 0;
-    }
+    vsync_enabled = 0;
+    // if (average > 27 && average < 33) {
+    //     SDL_GL_SetSwapInterval(1);
+    // } else if (average > 57 && average < 63) {
+    //     SDL_GL_SetSwapInterval(2);
+    // } else if (average > 86 && average < 94) {
+    //     SDL_GL_SetSwapInterval(3);
+    // } else if (average > 115 && average < 125) {
+    //     SDL_GL_SetSwapInterval(4);
+    // } else {
+    //     vsync_enabled = 0;
+    // }
 }
 
 static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen, bool start_in_foreground) {
@@ -285,7 +285,7 @@ static void sync_framerate_with_timer(void) {
 
 static void gfx_sdl_swap_buffers_begin(void) {
     if (!vsync_enabled) {
-        sync_framerate_with_timer();
+        // sync_framerate_with_timer();
     }
 
     SDL_GL_SwapWindow(wnd);

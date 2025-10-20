@@ -93,6 +93,29 @@
     <div id="container">
       <canvas class="emscripten" id="canvas"></canvas>
     </div>
+    <script>
+      // const originalSetTimeout = window.setTimeout;
+
+      // // Override setTimeout
+      // window.setTimeout = function(callback, delay, ...args) {
+      //     console.log('setTimeout triggered:', { callback, delay, args });
+      //     return originalSetTimeout(callback, delay, ...args);
+      // };
+
+      // // Store the original requestAnimationFrame function
+      // const originalRequestAnimationFrame = window.requestAnimationFrame;
+
+      // // Override requestAnimationFrame
+      // window.requestAnimationFrame = function(callback) {
+      //     console.log('requestAnimationFrame triggered:', { callback });
+      //     return originalRequestAnimationFrame((timestamp) => {
+      //         console.log('Animation Frame Timestamp:', timestamp);
+      //         return callback(timestamp);
+      //     });
+      // };
+
+
+    </script>
     <script src="pkg/sm64.us.js"></script>
     <script src="pkg/sm64_headless.us.js"></script>
     <script src="solution_22.js"></script>
