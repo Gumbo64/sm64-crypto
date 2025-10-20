@@ -115,17 +115,6 @@ bool has_won() {
 #include <string.h>
 
 
-unsigned long simple_hash(const char *str) {
-    unsigned long hash = 5381;
-    int c;
-
-    while ((c = *str++)) {
-        hash = ((hash << 5) + hash) + c; // hash * 33 + c
-    }
-    
-    return hash;
-}
-
 void update_seed() {
     rng_update(rng_next() ^ (uint32_t)gMarioState->pos[0]);
     rng_update(rng_next() ^ (uint32_t)gMarioState->pos[1]);
@@ -138,52 +127,53 @@ void update_seed() {
 }
 
 void main_loop() {
-    // #ifndef TARGET_WEB
-    struct timespec ts;
-    ts.tv_sec = 0;
-    ts.tv_nsec = 33333333 / get_speed();
-    nanosleep(&ts, &ts);
-    // #endif
-
     update_seed();
 
     produce_one_frame();
     if (has_won()) {
         exit_game(0);
     }
+
+    #ifndef TARGET_WEB
+    struct timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 33333333 / get_speed();
+    nanosleep(&ts, &ts);
+    #endif
 }
 
 #ifdef TARGET_WEB
 static void em_main_loop(void) {
+    main_loop();
 }
 
-static void request_anim_frame(void (*func)(double time)) {
-    EM_ASM(requestAnimationFrame(function(time) {
-        dynCall("vd", $0, [time]);
-    }), func);
-}
+// static void request_anim_frame(void (*func)(double time)) {
+//     EM_ASM(requestAnimationFrame(function(time) {
+//         dynCall("vd", $0, [time]);
+//     }), func);
+// }
 
-static void on_anim_frame(double time) {
-    static double target_time;
+// static void on_anim_frame(double time) {
+//     static double target_time;
 
-    time *= 0.03 / get_speed(); // milliseconds to frame count (33.333 ms -> 1)
+//     time *= 0.03; // milliseconds to frame count (33.333 ms -> 1)
 
-    if (time >= target_time + 10.0) {
-        // We are lagging 10 frames behind, probably due to coming back after inactivity,
-        // so reset, with a small margin to avoid potential jitter later.
-        target_time = time - 0.010;
-    }
+//     if (time >= target_time + 10.0) {
+//         // We are lagging 10 frames behind, probably due to coming back after inactivity,
+//         // so reset, with a small margin to avoid potential jitter later.
+//         target_time = time - 0.010;
+//     }
 
-    for (int i = 0; i < 2; i++) {
-        // If refresh rate is 15 Hz or something we might need to generate two frames
-        if (time >= target_time) {
-            main_loop();
-            target_time = target_time + 1.0;
-        }
-    }
-
-    request_anim_frame(on_anim_frame);
-}
+//     for (int i = 0; i < 2; i++) {
+//         // If refresh rate is 15 Hz or something we might need to generate two frames
+//         if (time >= target_time) {
+//             main_loop();
+//             target_time = target_time + 1.0 / get_speed();
+//         }
+//     }
+//     printf()
+//     request_anim_frame(on_anim_frame);
+// }
 #endif
 
 static void save_config(void) {
@@ -209,10 +199,8 @@ void main_func(uint32_t seed, char filename[FILENAME_MAX], int record_mode, int 
     atexit(save_config);
 
 #ifdef TARGET_WEB
-    // emscripten_set_main_loop(em_main_loop, 0, 0);
+    emscripten_set_main_loop(em_main_loop, 0, 0);
     // request_anim_frame(on_anim_frame);
-    // emscripten_cancel_main_loop();
-    emscripten_set_main_loop(main_loop,0,0);
 #endif
 
 #if defined(HEADLESS_VERSION)
@@ -275,13 +263,8 @@ void main_func(uint32_t seed, char filename[FILENAME_MAX], int record_mode, int 
 
     true_tas_init(filename, record_mode, seed);
 
-#ifdef TARGET_WEB
-    /*for (int i = 0; i < atoi(argv[1]); i++) {
-        game_loop_one_iteration();
-    }*/
     inited = 1;
-#else
-    inited = 1;
+#ifndef TARGET_WEB
     while (1) {
         wm_api->main_loop(main_loop);
     }

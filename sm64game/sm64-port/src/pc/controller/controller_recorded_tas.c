@@ -23,7 +23,7 @@ static float speed = 10;
 #endif
 
 
-const int max_playtime_sec = 20;
+const int max_playtime_sec = 600;
 static uint32_t file_length = 0;
 
 static char filename[FILENAME_MAX] = "cont.m64";
@@ -44,7 +44,6 @@ void exit_game(int code) {
     fclose(fp);
 
     #ifdef TARGET_WEB
-    // emscripten_cancel_main_loop();
     emscripten_force_exit(code);
     #endif
     exit(code);
@@ -225,6 +224,12 @@ static void tas_read(OSContPad *pad) {
         // This function also decides when playback ends, so we might record immediately after this
         playback_game(pad, rng_pad_p);
     }
+
+    // special command to restart game
+    if ((pad->button & L_TRIG) != 0) {
+        exit_game(1);
+    }
+
     if (is_finished_playback) {
         record_game(pad, rng_pad_p);
     }

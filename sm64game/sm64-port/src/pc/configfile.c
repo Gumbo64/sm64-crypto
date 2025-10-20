@@ -44,6 +44,7 @@ unsigned int configKeyStickUp    = 0x11;
 unsigned int configKeyStickDown  = 0x1F;
 unsigned int configKeyStickLeft  = 0x1E;
 unsigned int configKeyStickRight = 0x20;
+unsigned int configKeyL          = 0x10;
 
 
 static const struct ConfigOption options[] = {
@@ -52,6 +53,7 @@ static const struct ConfigOption options[] = {
     {.name = "key_b",          .type = CONFIG_TYPE_UINT, .uintValue = &configKeyB},
     {.name = "key_start",      .type = CONFIG_TYPE_UINT, .uintValue = &configKeyStart},
     {.name = "key_r",          .type = CONFIG_TYPE_UINT, .uintValue = &configKeyR},
+    {.name = "key_l",          .type = CONFIG_TYPE_UINT, .uintValue = &configKeyL},
     {.name = "key_z",          .type = CONFIG_TYPE_UINT, .uintValue = &configKeyZ},
     {.name = "key_cup",        .type = CONFIG_TYPE_UINT, .uintValue = &configKeyCUp},
     {.name = "key_cdown",      .type = CONFIG_TYPE_UINT, .uintValue = &configKeyCDown},

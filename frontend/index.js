@@ -2,39 +2,80 @@ function sleep(time) {
   return new Promise((resolve) => setTimeout(resolve, time));
 }
 
-async function runGame(seed, filename, record_mode, canvas) {
-    let our_canvas = false;
-    if (canvas == null) {
-        our_canvas = true;
-        canvas = document.createElement('canvas');
-        canvas.width  = 640;
-        canvas.height = 480;
-        document.body.appendChild(canvas);
+async function evaluate(seed, filename, solution_bytes = [], headless = true) {
+    var statusCode = NaN;
+    var game;
+    if (headless) {
+        game = await SM64_HEADLESS({
+            "canvas": document.querySelector("#canvas"), 
+            "onExit": (e) => {
+                statusCode = e;
+            }
+        });
+    } else {
+        game = await SM64({
+            "canvas": document.querySelector("#canvas"), 
+            "onExit": (e) => {
+                statusCode = e;
+            }
+        });
+    }
+    
+    if (solution_bytes) {
+        var stream = FS.open(filename, 'w+');
+        game.FS.write(stream, solution_bytes, 0, solution_bytes.length, 0);
+        game.FS.close(stream);
     }
 
 
-    var statusCode = NaN;
-    
-    var game = await SM64({
-        "canvas": canvas, 
-        "onExit": (e) => {
-            statusCode = e;
-        }, 
-        // "onAbort": () => {}
-    });
-    game.callMain([seed, filename, record_mode]);
-
+    game.callMain([seed, filename, "0"]);
     while (isNaN(statusCode)) {
         await sleep(500);
     }
-    console.log("DONE!!!");
-    console.log(statusCode)
-    
-    
-    if (our_canvas) {
-        document.body.removeChild(canvas);
-    }
-    
-    return statusCode;
+    // execution is finished
+
+    var success = statusCode == 0;
+    return success;
 }
-runGame("22", "epic.m64", "1", document.querySelector("#canvas"));
+
+async function record(seed, filename, starting_bytes = []) {
+    var statusCode = NaN;
+    var game = await SM64({
+        "canvas": document.querySelector("#canvas"), 
+        "onExit": (e) => {
+            statusCode = e;
+        }
+    });
+
+    if (starting_bytes) {
+        var stream = game.FS.open(filename, 'w+');
+        game.FS.write(stream, starting_bytes, 0, starting_bytes.length, 0);
+        game.FS.close(stream);
+    }
+
+    game.callMain([seed, filename, "1"]);
+    while (isNaN(statusCode)) {
+        await sleep(500);
+    }
+    // execution is finished
+
+    var success = statusCode == 0;
+    var solution_bytes = game.FS.open(filename).node.contents;
+    console.log(success);
+    console.log(solution_bytes);
+    return [success, solution_bytes];
+}
+
+// runGame("22", "epic.m64", "1", );
+
+
+
+async function record_loop() {
+    var success = false;
+    var starting_bytes = solution_22_array;
+    while (!success) {
+        [success, starting_bytes] = await record("22", "awesome.m64", starting_bytes);
+    }
+
+}
+record_loop();
