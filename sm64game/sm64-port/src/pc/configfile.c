@@ -31,11 +31,11 @@ struct ConfigOption {
  */
 bool configFullscreen            = false;
 // Keyboard mappings (scancode values)
-unsigned int configKeyA          = 0x26;
-unsigned int configKeyB          = 0x33;
+unsigned int configKeyA          = 0x17;
+unsigned int configKeyB          = 0x24;
 unsigned int configKeyStart      = 0x39;
 unsigned int configKeyR          = 0x36;
-unsigned int configKeyZ          = 0x25;
+unsigned int configKeyZ          = 0x18;
 unsigned int configKeyCUp        = 0x148;
 unsigned int configKeyCDown      = 0x150;
 unsigned int configKeyCLeft      = 0x14B;

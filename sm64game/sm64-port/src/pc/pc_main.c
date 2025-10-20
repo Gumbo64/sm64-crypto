@@ -205,7 +205,7 @@ void main_func(uint32_t seed, char filename[FILENAME_MAX], int record_mode, int 
 #endif
     gEffectsMemoryPool = mem_pool_init(0x4000, MEMORY_POOL_LEFT);
 
-    // configfile_load(CONFIG_FILE);
+    configfile_load(CONFIG_FILE);
     atexit(save_config);
 
 #ifdef TARGET_WEB
@@ -344,26 +344,6 @@ void step_game(int steps, int stickX, int stickY, int button) {
         produce_one_frame();
     }
 }
-
-// void reset(void) {
-//     gGlobalTimer = 0;
-//     gResetTimer = 0;
-//     gNmiResetBarsTimer = 0;
-//     gDebugLevelSelect = 0;
-//     gShowProfiler = 0;
-//     gShowDebugText = 0;
-
-//     thread5_game_loop(NULL);
-//     random_seed_set(0);
-//     // Reset the game state
-// }
-
-void end(void) {
-    // wm_api->deinit();
-    exit(0);
-}
-
-
 
 struct MarioState *get_mario_state() {
     return gMarioState;

@@ -294,7 +294,7 @@ ifeq ($(HEADLESS_VERSION), 1)
 endif
 
 ifeq ($(TARGET_WEB),1)
-  EXE := $(BUILD_DIR)/$(TARGET).html
+  EXE := $(BUILD_DIR)/$(TARGET).js
 else ifeq ($(TARGET_WINDOWS),1)
   EXE := $(BUILD_DIR)/$(TARGET).exe
 else
@@ -505,7 +505,7 @@ ifeq ($(TARGET_WEB),1)
 
   PLATFORM_CFLAGS  := -DTARGET_WEB -fPIC
 #   PLATFORM_LDFLAGS := -lm -no-pie -s TOTAL_MEMORY=20MB -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_FUNCTIONS=_main_func,_step_game,_get_mario_state,_get_game_info,_get_lakitu_pos,_get_lakitu_yaw,_end
-  PLATFORM_LDFLAGS := -lm -no-pie -sUSE_SDL=2  -sTOTAL_MEMORY=20MB -sFULL_ES2 -sFULL_ES3 -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_FUNCTIONS=_main
+  PLATFORM_LDFLAGS := -lm -no-pie -sUSE_SDL=2 -sMODULARIZE -sEXPORT_NAME=SM64_MODULE -sTOTAL_MEMORY=20MB -sFULL_ES2 -sFULL_ES3 -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_RUNTIME_METHODS=callMain,abort
 
 #   -sEXPORTED_RUNTIME_METHODS=callMain -sALLOW_MEMORY_GROWTH
 endif
