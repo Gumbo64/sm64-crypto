@@ -11,6 +11,7 @@ float get_speed();
 
 void rng_update(uint32_t input);
 uint32_t rng_next();
+void exit_game(int code);
 
 
 #endif

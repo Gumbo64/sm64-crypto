@@ -263,7 +263,7 @@ static void gfx_sdl_handle_events(void) {
                 }
                 break;
             case SDL_QUIT:
-                exit(0);
+                exit(1);
         }
     }
 }

@@ -35,9 +35,13 @@ all: copy-rom
 
 	cp $(SM64PC)/build/us_pc_headless/sm64.us prod/sm64_headless.us
 	cp $(SM64PC)/build/us_pc/sm64.us prod/sm64.us
-	cp $(SM64PC)/build/us_web_headless/sm64.us.wasm prod/sm64_headless.us.wasm
-	cp $(SM64PC)/build/us_web/sm64.us.wasm prod/sm64.us.wasm
 
+	
+	cp $(SM64PC)/build/us_web_headless/sm64.us.wasm frontend/pkg/sm64_headless.us.wasm
+	cp $(SM64PC)/build/us_web_headless/sm64.us.js frontend/pkg/sm64_headless.us.js
+
+	cp $(SM64PC)/build/us_web/sm64.us.wasm frontend/pkg/sm64.us.wasm
+	cp $(SM64PC)/build/us_web/sm64.us.js frontend/pkg/sm64.us.js
 
 	cp -r prod/* prod2
 

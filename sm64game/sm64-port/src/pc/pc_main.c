@@ -149,7 +149,7 @@ void main_loop() {
 
     produce_one_frame();
     if (has_won()) {
-        exit(0);
+        exit_game(0);
     }
 }
 
@@ -211,7 +211,7 @@ void main_func(uint32_t seed, char filename[FILENAME_MAX], int record_mode, int 
 #ifdef TARGET_WEB
     // emscripten_set_main_loop(em_main_loop, 0, 0);
     // request_anim_frame(on_anim_frame);
-    emscripten_cancel_main_loop();
+    // emscripten_cancel_main_loop();
     emscripten_set_main_loop(main_loop,0,0);
 #endif
 

@@ -452,7 +452,7 @@ static void gfx_glx_handle_events(void) {
         }
         if (xev.type == ClientMessage) {
             if (xev.xclient.data.l[0] == wm_delete_window) {
-                exit(0);
+                exit(1);
             }
         }
     }

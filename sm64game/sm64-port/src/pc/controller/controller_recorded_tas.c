@@ -7,6 +7,11 @@
 
 #include "controller_api.h"
 
+#ifdef TARGET_WEB
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#endif
+
 static FILE *fp = NULL;
 static int is_finished_playback = 0;
 static int record_mode = 0;
@@ -17,9 +22,34 @@ static float speed = 100000;
 static float speed = 10;
 #endif
 
+
+const int max_playtime_sec = 20;
 static uint32_t file_length = 0;
 
 static char filename[FILENAME_MAX] = "cont.m64";
+
+void exit_game(int code);
+void trunc_seek() {
+    if (ftruncate(fileno(fp), file_length) != 0) {
+        perror("Failed to truncate the file");
+        exit_game(1);
+    }
+    if (fseek(fp, file_length, SEEK_SET) != 0) {
+        perror("Error seeking in file");
+        exit_game(1);
+    }
+}
+void exit_game(int code) {
+    trunc_seek();
+    fclose(fp);
+
+    #ifdef TARGET_WEB
+    // emscripten_cancel_main_loop();
+    emscripten_force_exit(code);
+    #endif
+    exit(code);
+}
+
 typedef struct {
     uint32_t window_cur_amount;
     uint32_t window_length_max;
@@ -67,7 +97,7 @@ void true_tas_init(char supplied_filename[FILENAME_MAX], int rec_mode, uint32_t 
     if (fp == NULL) {
         fp = fopen(filename, "wb+");
         if (fp == NULL) {
-            exit(1);
+            exit_game(1);
         }
     }
 
@@ -77,16 +107,7 @@ float get_speed() {
     return speed;
 }
 
-void trunc_seek() {
-    if (ftruncate(fileno(fp), file_length) != 0) {
-        perror("Failed to truncate the file");
-        exit(1);
-    }
-    if (fseek(fp, file_length, SEEK_SET) != 0) {
-        perror("Error seeking in file");
-        exit(1);
-    }
-}
+
 
 
 static void tas_init(void) {}
@@ -109,7 +130,7 @@ static void playback_game(OSContPad *pad, OSContPad *rng_pad) {
 
         // check that the playback follows the random input
         if (rng_pad != NULL && (pad->stick_x != rng_pad->stick_x || pad->stick_y != rng_pad->stick_y || pad->button != rng_pad->button)) {
-            exit(1);
+            exit_game(1);
         }
 
         file_length += bytesRead;
@@ -120,7 +141,7 @@ static void playback_game(OSContPad *pad, OSContPad *rng_pad) {
         is_finished_playback = 1;
         speed = 1;
         if (!record_mode) {
-            exit(1); // failed to complete within the evaluation time
+            exit_game(1); // failed to complete within the evaluation time
         }
         printf("FINISHED READING\n");
     }
@@ -147,6 +168,8 @@ static void record_game(OSContPad *pad, OSContPad *rng_pad) {
     bytes[3] = pad->stick_y;               // Stick Y value
 
     fwrite(bytes, 1, sizeof(bytes), fp);  // Append the 4 bytes to the file
+    file_length += sizeof(bytes);
+
 }
 
 static OSContPad random_pad() {
@@ -185,6 +208,10 @@ static int is_random_action() {
 static void tas_read(OSContPad *pad) {
     if (fp == NULL) {
         return; // Early exit if not initialized or file is closed
+    }
+
+    if (file_length >= 4*30*max_playtime_sec) {
+        exit_game(1);
     }
 
     OSContPad rng_pad;
