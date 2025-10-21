@@ -1,9 +1,7 @@
 # Main Makefile
-
-SM64ENV = sm64game
-SM64PC = $(SM64ENV)/sm64-port
-
 ROM_FILE = baserom.us.z64
+
+SM64PC = sm64-port
 RELEASE = target/release
 PROD = prod
 

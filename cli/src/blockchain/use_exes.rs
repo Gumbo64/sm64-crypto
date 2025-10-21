@@ -148,10 +148,10 @@ pub fn ez_evaluate(seed: &str, solution_bytes: &Vec<u8>, fps: i8) -> bool {
     }
 
     let status = Command::new(sm64_path)
-            .arg(seed)
-            .arg(filename)
-            .arg("0")
-            .spawn().expect("Failed to execute command").wait().expect("");
+        .arg(seed)
+        .arg(filename)
+        .arg("0")
+        .spawn().expect("Failed to execute command").wait().expect("");
 
     let success: bool = status.success();
     success
