@@ -38,7 +38,6 @@ cli-build:
 EMSDK_PATH := $(shell which emcc)
 
 web-build:
-
 	@echo "$(GREEN)\nBUILDING WEB VERSION$(RESET)"
 	mkdir -p $(WEB_PROD); 
 	@if [ -z "$(EMSDK_PATH)" ]; then \

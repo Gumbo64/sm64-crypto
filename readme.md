@@ -19,10 +19,11 @@ Progress:
 - [x] P2P Networking, broadcasting blocks
 - [x] Consensus and syncing
 - [x] Calculating random seeds and random input generation
+- [ ] Browser Version
 - [ ] Wallets
 - [ ] Transactions
 
-## Controls
+<!-- ## Controls
 Keyboard button - N64 Button
 * WASD - Joystick
 * I - A
@@ -34,7 +35,7 @@ Special keys
 * R - Go back ~4 seconds in the run
 * Q - Completely restart run
 * hold Space - Change to 0.1x Speed
-* hold (Shift + Space) - Change to 10x Speed (or as fast as your computer can go)
+* hold (Shift + Space) - Change to 10x Speed (or as fast as your computer can go) -->
 
 ## ./main Executable options
 Options:
@@ -46,7 +47,7 @@ Options:
 
 ie `./main --nowait --mine --miner-name "your name here"`
 
-## Installation
+## Building
 Before you begin, ensure you have the following:
 - **SM64 z64**: Ensure that you legally obtain a US copy of the game as a z64 file. It should be 8.00MB large
 
@@ -71,14 +72,14 @@ You may have to install WSL manually if this install script fails.
   When rust is installing, press enter if you don't have rust or press 3 if you already have rust
 6. after it is done, run `play_game.sh` to play OR cd into `prod` and run `./main` using your chosen commands
 
-### Podman Desktop (no GUI or mining)
+<!-- ### Podman Desktop (no GUI or mining)
 1. Put baserom.us.z64 in the root folder (next to readme.md etc)
 2. On podman desktop, go Containers -> Create -> Containerfile or Dockerfile (purple)
 3. Select Containerfile path by navigating to this folder, then selecting Dockerfile
 4. Name it sm64-crypto optionally
 5. Click Build and wait for it to build
 6. Once it's done, go to Images and click the icon next to the sm64-crypto image that looks like a play button
-7. go to the bottom and click Start Container
+7. go to the bottom and click Start Container -->
 
 ## Credits
 * Iroh
