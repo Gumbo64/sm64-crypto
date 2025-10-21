@@ -134,12 +134,12 @@ void main_loop() {
         exit_game(0);
     }
 
-    // #ifndef TARGET_WEB
+    #ifndef TARGET_WEB
     struct timespec ts;
     ts.tv_sec = 0;
     ts.tv_nsec = 33333333 / get_speed();
     nanosleep(&ts, &ts);
-    // #endif
+    #endif
 }
 
 #ifdef TARGET_WEB
@@ -159,10 +159,25 @@ static void request_anim_frame(void (*func)(double time)) {
 }
 
 static void on_anim_frame(double time) {
-    static double last_time = 0;
-    main_loop();
-    // printf("%f\n", time - last_time);
-    last_time = time;
+    static double target_time = 0;
+
+    time *= 0.03; // milliseconds to frame count (33.333 ms -> 1)
+
+    if (time >= target_time + 10.0) {
+        // We are lagging 10 frames behind, probably due to coming back after inactivity,
+        // so reset, with a small margin to avoid potential jitter later.
+        target_time = time - 0.010;
+    }
+
+    while (time >= target_time) {
+        main_loop();
+        target_time = target_time + 1.0/get_speed();
+    }
+
+    // for (int i = 0; i < get_speed(); i++) {
+    //     main_loop();
+    // }
+
     request_anim_frame(on_anim_frame);
 }
 #endif
