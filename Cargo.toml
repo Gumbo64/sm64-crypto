@@ -2,3 +2,4 @@
 members = [
     "cli",
 ]
+resolver = "3"

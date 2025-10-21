@@ -222,23 +222,23 @@ endif
 COLOR ?= 1
 
 # display selected options unless 'make clean' or 'make distclean' is run
-ifeq ($(filter clean distclean,$(MAKECMDGOALS)),)
-  $(info ==== Build Options ====)
-  $(info Version:        $(VERSION))
-  $(info Microcode:      $(GRUCODE))
-  $(info Target:         $(TARGET))
-  ifeq ($(COMPARE),1)
-    $(info Compare ROM:    yes)
-  else
-    $(info Compare ROM:    no)
-  endif
-  ifeq ($(NON_MATCHING),1)
-    $(info Build Matching: no)
-  else
-    $(info Build Matching: yes)
-  endif
-  $(info =======================)
-endif
+# ifeq ($(filter clean distclean,$(MAKECMDGOALS)),)
+#   $(info ==== Build Options ====)
+#   $(info Version:        $(VERSION))
+#   $(info Microcode:      $(GRUCODE))
+#   $(info Target:         $(TARGET))
+#   ifeq ($(COMPARE),1)
+#     $(info Compare ROM:    yes)
+#   else
+#     $(info Compare ROM:    no)
+#   endif
+#   ifeq ($(NON_MATCHING),1)
+#     $(info Build Matching: no)
+#   else
+#     $(info Build Matching: yes)
+#   endif
+#   $(info =======================)
+# endif
 
 
 #==============================================================================#
@@ -265,12 +265,12 @@ ifeq ($(filter clean distclean print-%,$(MAKECMDGOALS)),)
   endif
 
   # Make tools if out of date
-  $(info Building tools...)
+#   $(info Building tools...)
   DUMMY != $(MAKE) -s -C $(TOOLS_DIR) $(if $(filter-out ido0,$(COMPILER)$(USE_QEMU_IRIX)),all-except-recomp,) >&2 || echo FAIL
     ifeq ($(DUMMY),FAIL)
       $(error Failed to build tools)
     endif
-  $(info Building ROM...)
+#   $(info Building ROM...)
 
 endif
 
@@ -986,4 +986,4 @@ MAKEFLAGS += --no-builtin-rules
 
 -include $(DEP_FILES)
 
-print-% : ; $(info $* is a $(flavor $*) variable set to [$($*)]) @true
+# print-% : ; $(info $* is a $(flavor $*) variable set to [$($*)]) @true

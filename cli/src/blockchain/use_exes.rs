@@ -10,6 +10,7 @@ use tempfile::NamedTempFile;
 use std::io::{Read, Write};
 use std::fs::File;
 
+#[allow(unused)]
 pub fn ez_record(seed: &str, starting_bytes: &Vec<u8>) -> (Vec<u8>, bool) {
     // Locate sibling binaries (built in the same target dir as this binary)
     let exe_path = env::current_exe().expect("Failed to get current executable path");
@@ -114,6 +115,7 @@ pub fn record_loop(seed: &str,  kill_signal: Arc<Mutex<bool>>) -> Result<Vec<u8>
     Ok(solution_bytes)
 }
 
+#[allow(unused)]
 pub fn ez_record_loop(seed: &str) -> Vec<u8> {
     let mut solution_bytes: Vec<u8> = Vec::new();
     loop {
