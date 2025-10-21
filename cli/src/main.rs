@@ -1,15 +1,13 @@
 
 use clap::Parser;
 
-use n0_snafu::{Result, };
+use n0_snafu::Result;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::time;
 
-mod blockchain;
-use blockchain::{BlockChain, MAX_NAME_LENGTH};
-
+use sm64_crypto_shared::{BlockChain, MAX_NAME_LENGTH};
 
 #[derive(Parser, Debug)]
 struct Args {
