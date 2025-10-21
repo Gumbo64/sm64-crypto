@@ -133,7 +133,7 @@ pub fn ez_evaluate(seed: &str, solution_bytes: &Vec<u8>, fps: i8) -> bool {
     let current_directory = exe_path.parent().expect("Failed to get parent directory");
     let sm64_path;
 
-    if (fs > 0) {
+    if fps > 0 {
         sm64_path = current_directory.join("sm64.us");
     } else {
         sm64_path = current_directory.join("sm64_headless.us");
