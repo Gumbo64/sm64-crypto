@@ -3,7 +3,10 @@ ROM_FILE = baserom.us.z64
 
 SM64PC = sm64-port
 RELEASE = target/release
+
+
 PROD = prod
+WEB_PROD = web/pkg
 
 # Define the target that will copy the ROM file and call the Makefile in SM64PC
 all: copy-rom
@@ -13,10 +16,10 @@ all: copy-rom
 # 	WEB BUILDING
 	$(MAKE) -C $(SM64PC) -j TARGET_WEB=1
 	$(MAKE) -C $(SM64PC) -j TARGET_WEB=1 HEADLESS_VERSION=1
-	cp $(SM64PC)/build/us_web_headless/sm64.us.wasm frontend/pkg/sm64_headless.us.wasm
-	cp $(SM64PC)/build/us_web_headless/sm64.us.js frontend/pkg/sm64_headless.us.js
-	cp $(SM64PC)/build/us_web/sm64.us.wasm frontend/pkg/sm64.us.wasm
-	cp $(SM64PC)/build/us_web/sm64.us.js frontend/pkg/sm64.us.js
+	cp $(SM64PC)/build/us_web_headless/sm64.us.wasm $(WEB_PROD)/sm64_headless.us.wasm
+	cp $(SM64PC)/build/us_web_headless/sm64.us.js $(WEB_PROD)/sm64_headless.us.js
+	cp $(SM64PC)/build/us_web/sm64.us.wasm $(WEB_PROD)/sm64.us.wasm
+	cp $(SM64PC)/build/us_web/sm64.us.js $(WEB_PROD)/sm64.us.js
 
 #   CLI BUILDING
 	$(MAKE) -C $(SM64PC) -j
