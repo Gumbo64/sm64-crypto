@@ -145,7 +145,7 @@ void configfile_load(const char *filename) {
     FILE *file;
     char *line;
 
-    printf("Loading configuration from '%s'\n", filename);
+    // printf("Loading configuration from '%s'\n", filename);
 
     file = fopen(filename, "r");
     if (file == NULL) {
@@ -193,7 +193,7 @@ void configfile_load(const char *filename) {
                         default:
                             assert(0); // bad type
                     }
-                    printf("option: '%s', value: '%s'\n", tokens[0], tokens[1]);
+                    // printf("option: '%s', value: '%s'\n", tokens[0], tokens[1]);
                 }
             } else
                 puts("error: expected value");
@@ -208,7 +208,7 @@ void configfile_load(const char *filename) {
 void configfile_save(const char *filename) {
     FILE *file;
 
-    printf("Saving configuration to '%s'\n", filename);
+    // printf("Saving configuration to '%s'\n", filename);
 
     file = fopen(filename, "w");
     if (file == NULL) {

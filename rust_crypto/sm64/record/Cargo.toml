@@ -1,8 +1,0 @@
-[package]
-name = "record"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-device_query = "4.0.1"
-sm64_so = { path = "../sm64_so" }

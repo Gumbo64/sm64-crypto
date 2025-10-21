@@ -142,7 +142,7 @@ static void playback_game(OSContPad *pad, OSContPad *rng_pad) {
         if (!record_mode) {
             exit_game(1); // failed to complete within the evaluation time
         }
-        printf("FINISHED READING\n");
+        // printf("FINISHED READING\n");
     }
 }
 

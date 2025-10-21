@@ -686,7 +686,7 @@ void thread5_game_loop(UNUSED void *arg) {
 #if ENABLE_RUMBLE
     create_thread_6();
 #endif
-    // save_file_load_all();
+    // save_file_load_all(); DON'T LOAD SAVE FILES
 
     set_vblank_handler(2, &gGameVblankHandler, &gGameVblankQueue, (OSMesg) 1);
 

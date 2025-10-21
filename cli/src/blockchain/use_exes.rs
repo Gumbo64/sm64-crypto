@@ -7,14 +7,14 @@ use tokio::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use tempfile::NamedTempFile;
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::fs::File;
 
 pub fn ez_record(seed: &str, starting_bytes: &Vec<u8>) -> (Vec<u8>, bool) {
     // Locate sibling binaries (built in the same target dir as this binary)
     let exe_path = env::current_exe().expect("Failed to get current executable path");
     let current_directory = exe_path.parent().expect("Failed to get parent directory");
-    let record_command_path = current_directory.join("record");
+    let sm64_path = current_directory.join("record");
 
     let mut solution_bytes_pipe = NamedTempFile::new().expect("failed to make temp file");
     let filename = solution_bytes_pipe.path();
@@ -23,14 +23,13 @@ pub fn ez_record(seed: &str, starting_bytes: &Vec<u8>) -> (Vec<u8>, bool) {
         file.write_all(starting_bytes).expect("");
     }
 
-    let output = Command::new(record_command_path)
+    let status = Command::new(sm64_path)
+        .arg(seed)    
         .arg(filename)
-        .arg(seed)     
-        .arg(MAX_SOLUTION_BYTES.to_string())       
-        .stdout(std::process::Stdio::piped())
-        .spawn().expect("").wait_with_output().expect("");
+        .arg("1")
+        .spawn().e().expect("").wait().expect("");
 
-    let won: bool = &output.stdout == &"true".as_bytes().to_vec();
+    let won: bool = status.success();
 
     // Read back from the temp file
     let mut solution_bytes = Vec::new();
@@ -42,7 +41,7 @@ pub fn record(seed: &str, starting_bytes: &Vec<u8>, kill_signal: Arc<Mutex<bool>
     // Locate sibling binaries (built in the same target dir as this binary)
     let exe_path = env::current_exe().expect("Failed to get current executable path");
     let current_directory = exe_path.parent().expect("Failed to get parent directory");
-    let record_command_path = current_directory.join("record");
+    let sm64_path = current_directory.join("sm64.us");
 
     let mut solution_bytes_pipe = NamedTempFile::new().expect("failed to make temp file");
     let filename = solution_bytes_pipe.path();
@@ -52,11 +51,10 @@ pub fn record(seed: &str, starting_bytes: &Vec<u8>, kill_signal: Arc<Mutex<bool>
     }
 
 
-    let mut child = Command::new(record_command_path)
+    let mut child = Command::new(sm64_path)
+        .arg(seed)    
         .arg(filename)
-        .arg(seed)            
-        .arg(MAX_SOLUTION_BYTES.to_string())       
-        .stdout(std::process::Stdio::piped())
+        .arg("1")
         .spawn().e()?;
 
     // Loop to check for kill signal and child process status
@@ -93,8 +91,8 @@ pub fn record(seed: &str, starting_bytes: &Vec<u8>, kill_signal: Arc<Mutex<bool>
         }
     }
 
-    let output = child.wait_with_output().expect("Failed to execute command");
-    let won: bool = &output.stdout == &"true".as_bytes().to_vec();
+    let status = child.wait().expect("Failed to execute command");
+    let won: bool = status.success();
 
     // Read back from the temp file
     let mut solution_bytes = Vec::new();
@@ -133,10 +131,15 @@ pub fn ez_record_loop(seed: &str) -> Vec<u8> {
 pub fn ez_evaluate(seed: &str, solution_bytes: &Vec<u8>, fps: i8) -> bool {
     let exe_path = env::current_exe().expect("Failed to get current executable path");
     let current_directory = exe_path.parent().expect("Failed to get parent directory");
-    let evaluate_command_path = current_directory.join("evaluate");
+    let sm64_path;
+
+    if (fs > 0) {
+        sm64_path = current_directory.join("sm64.us");
+    } else {
+        sm64_path = current_directory.join("sm64_headless.us");
+    }
 
     // Spawn `evaluate`, pass seed and fps as args
-
     let solution_bytes_pipe = NamedTempFile::new().expect("failed to make temp file");
     let filename = solution_bytes_pipe.path();
     {
@@ -144,38 +147,12 @@ pub fn ez_evaluate(seed: &str, solution_bytes: &Vec<u8>, fps: i8) -> bool {
         file.write_all(solution_bytes).expect("");
     }
 
-    let output = Command::new(evaluate_command_path)
-            .arg(filename)
+    let status = Command::new(sm64_path)
             .arg(seed)
-            .arg(fps.to_string())
-            .stdout(std::process::Stdio::piped())
-            .spawn().expect("Failed to execute command").wait_with_output().expect("");
+            .arg(filename)
+            .arg("0")
+            .spawn().expect("Failed to execute command").wait().expect("");
 
-    let success: bool = &output.stdout == &"true".as_bytes().to_vec();
+    let success: bool = status.success();
     success
-}
-
-use std::fs;
-use std::path::Path;
-
-use crate::blockchain::MAX_SOLUTION_BYTES;
-pub fn remove_tmp_so_files<P: AsRef<Path>>(dir: P) -> io::Result<()> {
-    let dir = dir.as_ref().join("tmp_so");
-    if !dir.exists() {
-        return Ok(());
-    }
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if let Some(ext) = path.extension() {
-            if ext == "so" {
-                if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
-                    if fname.ends_with(".tmp.so") {
-                        fs::remove_file(&path)?;
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
 }

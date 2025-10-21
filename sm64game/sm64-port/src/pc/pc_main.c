@@ -147,9 +147,7 @@ void main_loop() {
 }
 
 #ifdef TARGET_WEB
-static void em_main_loop(void) {
-    // main_loop();
-}
+static void em_main_loop(void) {}
 
 static void request_anim_frame(void (*func)(double time)) {
     EM_ASM(MainLoop.requestAnimationFrame(function(time) {

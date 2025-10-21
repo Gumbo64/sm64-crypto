@@ -12,7 +12,7 @@ use snafu::whatever;
 
 mod use_exes;
 
-use use_exes::{record_loop, ez_evaluate, remove_tmp_so_files};
+use use_exes::{record_loop, ez_evaluate};
 use sha2::{Sha256, Digest};
 
 use distributed_topic_tracker::{AutoDiscoveryGossip, RecordPublisher, TopicId, GossipReceiver, GossipSender};
@@ -82,8 +82,6 @@ impl Clone for BlockChain {
 
 impl BlockChain {
     pub async fn new(nowait: bool, showblocks: bool) -> Result<BlockChain> {
-        remove_tmp_so_files(".").e()?;
-
         let endpoint = Endpoint::builder()
             .discovery_n0()
             .bind()
