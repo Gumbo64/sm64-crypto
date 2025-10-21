@@ -32,6 +32,8 @@ cli-build:
 	$(MAKE) -C $(SM64PC) -j HEADLESS_VERSION=1
 	cp $(SM64PC)/build/us_pc_headless/sm64.us $(PROD)/sm64_headless.us
 
+	mkdir -p $(PROD)2
+	cp $(PROD)/main $(PROD)/sm64.us $(PROD)/sm64_headless.us $(PROD)2/
 # Web Build
 
 # Check if Emsdk is installed

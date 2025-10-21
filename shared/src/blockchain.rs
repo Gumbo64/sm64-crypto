@@ -10,9 +10,6 @@ use serde::{Deserialize, Serialize};
 
 use snafu::whatever;
 
-mod use_exes;
-
-use use_exes::{record_loop, ez_evaluate};
 use sha2::{Sha256, Digest};
 
 use distributed_topic_tracker::{AutoDiscoveryGossip, RecordPublisher, TopicId, GossipReceiver, GossipSender};
@@ -32,8 +29,8 @@ use chrono::{DateTime, Local, Utc};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BlockHead {
-    hash: Hash,
-    height: u128,
+    pub hash: Hash,
+    pub height: u128,
 }
 impl BlockHead {
     fn no_blocks(&self) -> bool {
@@ -61,9 +58,8 @@ impl Default for BlockHead {
 
 #[derive(Debug)]
 pub struct BlockChain {
-    router: Router, downloader: Downloader, blobs: BlobsProtocol, tags: Tags,
-    sender: GossipSender, db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>,
-    showblocks: bool
+    router: Router, downloader: Downloader, blobs: BlobsProtocol, tags: Tags, sender: GossipSender, 
+    db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>, block_eval_request: Arc<Mutex<Option<(Block, Option<bool>)>>>,
 }
 impl Clone for BlockChain {
     fn clone(&self) -> Self {
@@ -75,13 +71,13 @@ impl Clone for BlockChain {
             sender: self.sender.clone(),
             db_lock: Arc::clone(&self.db_lock), // We need to make sure it uses this function not just .clone()
             new_block_signal: Arc::clone(&self.new_block_signal),
-            showblocks: self.showblocks.clone()
+            block_eval_request: Arc::clone(&self.block_eval_request),
         }
     }
 }
 
 impl BlockChain {
-    pub async fn new(nowait: bool, showblocks: bool) -> Result<BlockChain> {
+    pub async fn new(nowait: bool) -> Result<(BlockChain, Arc<Mutex<Option<(Block, Option<bool>)>>>)> {
         let endpoint = Endpoint::builder()
             .discovery_n0()
             .bind()
@@ -132,9 +128,13 @@ impl BlockChain {
 
         let db_lock = Arc::new(Mutex::new(()));
         let new_block_signal = Arc::new(Mutex::new(false));
-        let bc = BlockChain{router, downloader, blobs, tags, sender, db_lock, new_block_signal, showblocks};
+        
+        let block_eval_request = Arc::new(Mutex::new(None));
+        let b_e_r = Arc::clone(&block_eval_request);
+
+        let bc = BlockChain{router, downloader, blobs, tags, sender, db_lock, new_block_signal, block_eval_request};
         task::spawn(BlockChain::subscribe_loop(bc.clone(), receiver));
-        Ok(bc)
+        Ok((bc, b_e_r))
     }
 
     async fn subscribe_loop(
@@ -168,9 +168,6 @@ impl BlockChain {
                                 Ok(_) => {
                                     bc.broadcast_head().await?;
                                     bc.print_state().await?;
-                                    if bc.showblocks {
-                                        bc.show_head().await?;
-                                    }
                                 },
                                 Err(_) => {println!("New block failed")}
                             }
@@ -189,7 +186,7 @@ impl BlockChain {
         }
         Ok(())
     }
-    pub async fn print_state(&self) -> Result<()> {
+    async fn print_state(&self) -> Result<()> {
         let head = self.get_head().await?;
         if !head.no_blocks() {
             let head_block = self.get_local_block(head.hash).await?;
@@ -220,7 +217,7 @@ impl BlockChain {
         Ok(())
     }
 
-    pub async fn get_head(&self) -> Result<BlockHead> {
+    async fn get_head(&self) -> Result<BlockHead> {
         let ott = self.tags.get(String::from("head")).await;
 
         match ott {
@@ -331,8 +328,10 @@ impl BlockChain {
                 whatever!("Failed genesis block");
             }
 
-            // Test if it works
-            if !block.evaluate_replay().await {
+            // Evaluate the replay
+            
+            // Create the request 
+            if !self.evaluate_replay(block).await {
                 whatever!("Replay fail");
             }
 
@@ -362,6 +361,22 @@ impl BlockChain {
         Ok(())
     }
 
+    async fn evaluate_replay(&self, block: Block) -> bool {
+        {
+            let mut e_request = self.block_eval_request.lock().await;
+            *e_request = Some((block, None));
+        }
+        loop {
+            let mut e_request = self.block_eval_request.lock().await;
+            if let Some((_req_block, req_bool)) = *e_request {
+                if let Some(result) = req_bool {
+                    *e_request = None;
+                    return result;
+                }
+            }
+        }
+    }
+
     async fn broadcast_block(&self, hash: Hash) -> Result<()> {
         let message = BlockMessage::NewBlockHead { hash };
         let encoded = message.encode().e()?.to_vec();
@@ -379,6 +394,7 @@ impl BlockChain {
         }
         self.broadcast_block(head.hash).await
     }
+
     async fn request_head(&self) -> Result<()> {
         let message = BlockMessage::RequestBlockHead{};
         let encoded = message.encode().e()?.to_vec();
@@ -387,19 +403,12 @@ impl BlockChain {
             Err(_) => whatever!("Request head fail") // Convert the error
         }
     }
-    pub async fn mine(&self, miner_name: [u8; MAX_NAME_LENGTH]) {
-        loop {
-            match self.mine_attempt(miner_name).await {
-                Ok(_) => {
-                    return;
-                },
-                Err(_e) => {
-                    println!("Resetting the game so we're mining from the newest block");
-                }
-            }
-        }
+
+    pub fn get_new_block_signal(&self) -> Arc<Mutex<bool>> {
+        Arc::clone(&self.new_block_signal)
     }
-    async fn mine_attempt(&self, miner_name: [u8; MAX_NAME_LENGTH]) -> Result<()> {
+
+    pub async fn start_mine(&self, miner_name: [u8; MAX_NAME_LENGTH]) -> Result<(Block, Arc<Mutex<bool>>)> {
         let mut _guard = self.db_lock.lock().await;
 
         {
@@ -410,10 +419,11 @@ impl BlockChain {
 
         let head = self.get_head().await.e()?;
 
-        // Mine a block. Release and then retake the lock after you finish playing
-        drop(_guard);
-        let new_block = Block::new(head, self.new_block_signal.clone(), miner_name).e()?;
-        _guard = self.db_lock.lock().await;
+        Ok((Block::new(head, miner_name), self.get_new_block_signal()))
+    }
+
+    pub async fn submit_mine(&self, new_block: Block) -> Result<()> {
+        let _guard = self.db_lock.lock().await;
 
         // Add block to blobs
         let new_hash = self.add_block_blob(new_block).await.e()?;
@@ -428,14 +438,15 @@ impl BlockChain {
         }
         Ok(())
     }
-    async fn show_head(&self) -> Result<()> {
-        let head = self.get_head().await.e()?;
-        if head.no_blocks() {
-            whatever!("No head to show");
-        }
-        let block = self.get_local_block(head.hash).await?;
-        ez_evaluate(&block.calc_seed(), &block.solution_bytes.to_vec(), 120);
-        Ok(())
+
+    // these two have _public because we shouldn't use them in this file. because we don't want to acquire locks
+    pub async fn get_head_public(&self) -> Result<BlockHead> {
+        let _guard = self.db_lock.lock().await;
+        self.get_head().await
+    }
+    pub async fn get_local_block_public(&self, hash: Hash) -> Result<Block> {
+        let mut _guard = self.db_lock.lock().await;
+        self.get_local_block(hash).await
     }
 }
 
@@ -444,8 +455,8 @@ impl BlockChain {
 const MAX_SOLUTION_TIME: usize = 600; // 600 seconds = 10 minutes
 const MAX_SOLUTION_BYTES: usize = MAX_SOLUTION_TIME * 30 * 4; // seconds * fps * (bytes per frame) 
 pub const MAX_NAME_LENGTH: usize = 64;
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct Block {
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct Block {
     prev_hash: Hash,
     block_height: u128,
     timestamp: DateTime<Utc>,
@@ -458,28 +469,22 @@ struct Block {
 }
 
 impl Block {
-    pub fn new(block_head: BlockHead, kill_signal: Arc<Mutex<bool>>, miner_name: [u8; MAX_NAME_LENGTH]) -> Result<Self> {
+    pub fn new(block_head: BlockHead, miner_name: [u8; MAX_NAME_LENGTH]) -> Self {
         let prev_hash = block_head.hash;
         let block_height = block_head.height.wrapping_add(1);
         
         let timestamp = Utc::now();
-
-
-        let mut solution_bytes: [u8; MAX_SOLUTION_BYTES] = [0; MAX_SOLUTION_BYTES];
-        let seed = Block {prev_hash, block_height, timestamp, miner_name, solution_bytes: solution_bytes.clone() }.calc_seed();
-         
-        let vec = record_loop(&seed, kill_signal)?;
-        assert!(vec.len() <= MAX_SOLUTION_BYTES);
-
-        let copy_length = vec.len().min(MAX_SOLUTION_BYTES);
-        solution_bytes[..copy_length].copy_from_slice(&vec[..copy_length]);
-
-        Ok(Block {prev_hash, block_height, timestamp, miner_name, solution_bytes })
+        let tmp_solution_bytes: [u8; MAX_SOLUTION_BYTES] = [0; MAX_SOLUTION_BYTES];
+        Block {prev_hash, block_height, timestamp, miner_name, solution_bytes:tmp_solution_bytes}
     }
-    async fn evaluate_replay(&self) -> bool {
-        ez_evaluate(&self.calc_seed(), &self.solution_bytes.to_vec(), 0)
+    pub fn seal(&mut self, solution_vec: Vec<u8>) {
+        assert!(solution_vec.len() <= MAX_SOLUTION_BYTES);
+
+        let copy_length = solution_vec.len().min(MAX_SOLUTION_BYTES);
+        self.solution_bytes[..copy_length].copy_from_slice(&solution_vec[..copy_length]);
     }
-    fn calc_seed(&self) -> String {
+
+    pub fn calc_seed(&self) -> String {
         let mut hasher = Sha256::new();
 
         let mut x = format!("{}", self.prev_hash);
@@ -497,12 +502,15 @@ impl Block {
         let result = hasher.finalize();
         hex::encode(result) // Convert the hash to a hex string
     }
+    pub fn get_solution(&self) -> Vec<u8> {
+        self.solution_bytes.to_vec().clone()
+    }
 
     fn encode(&self) -> Result<Bytes> {
         Ok(postcard::to_stdvec(&self).e()?.into())
     }
 
-    pub fn decode(bytes: &[u8]) -> Result<Block> {
+    fn decode(bytes: &[u8]) -> Result<Block> {
         Ok(postcard::from_bytes(bytes).e()?)
     }
 

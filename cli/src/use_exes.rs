@@ -130,15 +130,15 @@ pub fn ez_record_loop(seed: &str) -> Vec<u8> {
     solution_bytes
 }
 
-pub fn ez_evaluate(seed: &str, solution_bytes: &Vec<u8>, fps: i8) -> bool {
+pub fn ez_evaluate(seed: &str, solution_bytes: &Vec<u8>, headless: bool) -> bool {
     let exe_path = env::current_exe().expect("Failed to get current executable path");
     let current_directory = exe_path.parent().expect("Failed to get parent directory");
     let sm64_path;
 
-    if fps > 0 {
-        sm64_path = current_directory.join("sm64.us");
-    } else {
+    if headless {
         sm64_path = current_directory.join("sm64_headless.us");
+    } else {
+        sm64_path = current_directory.join("sm64.us");
     }
 
     // Spawn `evaluate`, pass seed and fps as args
