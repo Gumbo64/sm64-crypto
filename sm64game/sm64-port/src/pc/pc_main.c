@@ -29,6 +29,7 @@
 #include "audio/audio_null.h"
 
 #include "controller/controller_keyboard.h"
+#include "controller/controller_recorded_tas.h"
 
 #include "configfile.h"
 
@@ -86,19 +87,22 @@ void produce_one_frame(void) {
     gfx_start_frame();
     game_loop_one_iteration();
     
-    // int samples_left = audio_api->buffered();
-    // u32 num_audio_samples = samples_left < audio_api->get_desired_buffered() ? SAMPLES_HIGH : SAMPLES_LOW;
-    // //printf("Audio samples: %d %u\n", samples_left, num_audio_samples);
-    // s16 audio_buffer[SAMPLES_HIGH * 2 * 2];
-    // for (int i = 0; i < 2; i++) {
-    //     /*if (audio_cnt-- == 0) {
-    //         audio_cnt = 2;
-    //     }
-    //     u32 num_audio_samples = audio_cnt < 2 ? 528 : 544;*/
-    //     create_next_audio_buffer(audio_buffer + i * (num_audio_samples * 2), num_audio_samples);
-    // }
-    // printf("Audio samples before submitting: %d\n", audio_api->buffered());
-    // audio_api->play((u8 *)audio_buffer, 2 * num_audio_samples * 4);
+    if (get_speed() == 1) {
+        int samples_left = audio_api->buffered();
+        u32 num_audio_samples = samples_left < audio_api->get_desired_buffered() ? SAMPLES_HIGH : SAMPLES_LOW;
+        //printf("Audio samples: %d %u\n", samples_left, num_audio_samples);
+        s16 audio_buffer[SAMPLES_HIGH * 2 * 2];
+        for (int i = 0; i < 2; i++) {
+            /*if (audio_cnt-- == 0) {
+                audio_cnt = 2;
+            }
+            u32 num_audio_samples = audio_cnt < 2 ? 528 : 544;*/
+            create_next_audio_buffer(audio_buffer + i * (num_audio_samples * 2), num_audio_samples);
+        }
+        // printf("Audio samples before submitting: %d\n", audio_api->buffered());
+        audio_api->play((u8 *)audio_buffer, 2 * num_audio_samples * 4);
+    }
+
     
     gfx_end_frame();
 }
@@ -107,11 +111,11 @@ void produce_one_frame(void) {
 bool has_won() {
     return gMarioState->numStars > 0;
 }
-#include "controller/controller_recorded_tas.h"
 
 #ifndef TARGET_WEB
 #include <time.h>
 #endif
+
 #include <string.h>
 
 

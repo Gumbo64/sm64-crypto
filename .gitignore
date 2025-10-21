@@ -17,3 +17,4 @@ prod2
 blockchain_data
 rom
 *.wasm
+*.m64
