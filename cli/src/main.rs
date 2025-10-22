@@ -10,8 +10,9 @@ use tokio::sync::Mutex;
 
 mod use_exes;
 use use_exes::{record_loop, ez_evaluate};
+use sm64_crypto_shared::{BlockChain, Block, DEFAULT_CONFIG, Config};
 
-use sm64_crypto_shared::{BlockChain, Block, MAX_NAME_LENGTH};
+const CONFIG: Config = DEFAULT_CONFIG;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -42,19 +43,19 @@ enum Command {
 }
     // db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>, block_eval_request: Arc<Mutex<Option<(Block, Option<bool>)>>>,
 
-fn parse_miner_name(s: String) -> [u8; MAX_NAME_LENGTH] {
-    let mut miner_name: [u8; MAX_NAME_LENGTH] = [0; MAX_NAME_LENGTH];
+fn parse_miner_name(s: String) -> [u8; CONFIG.max_name_length] {
+    let mut miner_name: [u8; CONFIG.max_name_length] = [0; CONFIG.max_name_length];
     let vec = s;
-    assert!(vec.len() <= MAX_NAME_LENGTH);
-    let copy_length = vec.len().min(MAX_NAME_LENGTH);
+    assert!(vec.len() <= CONFIG.max_name_length);
+    let copy_length = vec.len().min(CONFIG.max_name_length);
     miner_name[..copy_length].copy_from_slice(&vec.as_bytes()[..copy_length]);
     miner_name
 }
 
-async fn mine_attempt(bc: &BlockChain, miner_name:[u8; MAX_NAME_LENGTH] ) -> Result<()> {
+async fn mine_attempt(bc: &BlockChain, miner_name:[u8; CONFIG.max_name_length] ) -> Result<()> {
     let (mut block, kill_signal) = bc.start_mine(miner_name).await?;
     let seed = block.calc_seed();
-    block.seal(record_loop(&seed, kill_signal)?);
+    block.seal(record_loop(seed, kill_signal, CONFIG)?);
     bc.submit_mine(block).await?;
     Ok(())
 }
@@ -64,7 +65,7 @@ async fn process_eval_request(block_eval_request: Arc<Mutex<Option<(Block, Optio
     let (block, _) = (*e_request)?;
     let seed = block.calc_seed();
     let solution_bytes = block.get_solution();
-    let success = ez_evaluate(&seed, &solution_bytes, true);
+    let success = ez_evaluate(seed, &solution_bytes, true, CONFIG);
     *e_request = Some((block, Some(success)));
     Some(())
 }
@@ -72,7 +73,7 @@ async fn process_eval_request(block_eval_request: Arc<Mutex<Option<(Block, Optio
 async fn show_head(bc: &BlockChain) -> Result<()> {
     let block_head = bc.get_head_public().await?;
     let block = bc.get_local_block_public(block_head.hash).await?;
-    ez_evaluate(&block.calc_seed(), &block.get_solution(), false);
+    ez_evaluate(block.calc_seed(), &block.get_solution(), false, CONFIG);
     Ok(())
 }
 
@@ -104,8 +105,6 @@ async fn main() {
 
 
     let (bc, block_eval_request) = BlockChain::new(args.nowait).await.expect("");
-
-
 
     tokio::spawn(async move {
         loop {

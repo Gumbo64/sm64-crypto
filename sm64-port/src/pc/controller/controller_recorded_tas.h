@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 extern struct ControllerAPI controller_recorded_tas;
-void true_tas_init(char supplied_filename[FILENAME_MAX], int record_mode, uint32_t seed);
+void true_tas_init(char supplied_filename[FILENAME_MAX], char info_filename[FILENAME_MAX]);
 float get_speed();
 
 void rng_update(uint32_t input);

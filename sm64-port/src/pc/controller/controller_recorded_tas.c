@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ultra64.h>
@@ -14,19 +15,40 @@
 
 static FILE *fp = NULL;
 static int is_finished_playback = 0;
-static int record_mode = 0;
-
-#ifdef HEADLESS_VERSION
-static float speed = 100000;
-#else
-static float speed = 10;
-#endif
-
-
-const int max_playtime_sec = 600;
 static uint32_t file_length = 0;
-
 static char filename[FILENAME_MAX] = "cont.m64";
+static float speed = 1;
+
+
+
+
+
+// config info
+static uint32_t record_mode = 1;
+// 600 seconds of 1x speed gameplay
+static uint32_t max_solution_bytes = 600 * (4*30);
+
+static uint32_t init_file_size = 1;
+
+
+static float min_playback_speed = 2;
+static float max_playback_speed = 100000;
+static float rewind_sec_amount = 10;
+
+typedef struct {
+    // Use a seed for randomness
+    uint32_t seed;
+
+    uint32_t max_window_length;
+    uint32_t max_random_action;
+    uint32_t window_cur_amount;
+    uint32_t random_action_amount;
+
+} RandomAction;
+
+static RandomAction rng = {
+    22, 100, 5, 0, 0
+};
 
 void exit_game(int code);
 void trunc_seek() {
@@ -49,24 +71,13 @@ void exit_game(int code) {
     exit(code);
 }
 
-typedef struct {
-    uint32_t window_cur_amount;
-    uint32_t window_length_max;
-    uint32_t random_action_amount;
-    uint32_t random_action_max;
-
-    // Use a seed for randomness
-    uint32_t state;
-} RandomAction;
-
-static RandomAction rng;
 uint32_t rng_next() {
     // this is xorshift32
-    uint32_t x = rng.state;
+    uint32_t x = rng.seed;
     x ^= (x << 13);
     x ^= (x >> 17);
     x ^= (x << 5);
-    rng.state = x;
+    rng.seed = x;
     return x;
 }
 
@@ -76,41 +87,84 @@ float rng_next_prob() {
 }
 
 void rng_update(uint32_t input) {
-    rng.state = rng_next() ^ input;
-    rng.state = rng_next();
+    rng.seed = rng_next() ^ input;
+    rng.seed = rng_next();
 }
 
-void true_tas_init(char supplied_filename[FILENAME_MAX], int rec_mode, uint32_t seed) {
-    record_mode = rec_mode;
+void read_value(FILE *fp, uint32_t *value) {
+    uint32_t x;
+    if (fread(&x, sizeof(uint32_t), 1, fp) == 1) {
+        *value = x;
+        // printf("%d\n", x);
+        return;
+    }
+    printf("FAILED TO LOAD, USING DEFAULT VALUE\n");
+}
+void read_info_file(char info_filename[FILENAME_MAX]) {
+    FILE * i_fp = fopen(info_filename, "rb");
+    if (i_fp == NULL) {
+        printf("FAILED TO LOAD INFO FILE\n");
+        return;
+    }
+
+    // Read values and apply defaults
+    read_value(i_fp, &rng.seed);
+    read_value(i_fp, &record_mode);
+    read_value(i_fp, &max_solution_bytes);
+
+    read_value(i_fp, &rng.max_window_length);
+    read_value(i_fp, &rng.max_random_action);
+    fclose(i_fp);
+}
+
+uint32_t get_file_size(const char *fname) {
+    struct stat st;
+    if (stat(fname, &st) != 0) {
+        perror("stat");
+        return -1;  // Error occurred
+    }
+    return st.st_size;  // Return file size
+}
+
+void true_tas_init(char supplied_filename[FILENAME_MAX], char info_filename[FILENAME_MAX]) {
     strncpy(filename, supplied_filename, FILENAME_MAX);
 
-    rng.state = seed;
-    rng.window_cur_amount = 0;
-    rng.random_action_amount = 0;
-    rng.window_length_max = 100;
-    rng.random_action_max = 5;
+    read_info_file(info_filename);
 
-    // Open/create the file in append and read mode
+
+    // Open/create the solution bytes file
     fp = fopen(filename, "rb+");
-    
     if (fp == NULL) {
         fp = fopen(filename, "wb+");
         if (fp == NULL) {
             exit_game(1);
         }
     }
-
+    init_file_size = get_file_size(filename);
 }
 
 float get_speed() {
     return speed;
 }
 
+#include <math.h>  // For pow()
+float calc_speed() {
+    // double base = 1/(max_playback_speed*1.0);
+    // double power = (file_length*1.0)/(fmax(init_file_size*1.0 - 5*(30*4),1));
+    // return  min_playback_speed + max_playback_speed * pow(base, power);
 
+    // float proportion = file_length*1.0/(fmax(init_file_size*1.0 - 3*(30*4) ,1.0));
+    // float s = max_playback_speed * (1-proportion);
+    // return fmax(s,min_playback_speed);
+
+    if (file_length < init_file_size - rewind_sec_amount * min_playback_speed * 4 * 30) {
+        return max_playback_speed;
+    }
+    return min_playback_speed;
+}
 
 
 static void tas_init(void) {}
-
 
 static void playback_game(OSContPad *pad, OSContPad *rng_pad) {
     // Allow the player to take over at any point during playback
@@ -133,6 +187,13 @@ static void playback_game(OSContPad *pad, OSContPad *rng_pad) {
         }
 
         file_length += bytesRead;
+
+        // you are likely to restart because of the end of the run, so we should speed up the beginning part
+        if (record_mode) {
+            speed = calc_speed();
+        } else {
+            speed = max_playback_speed;
+        }
     } else {
         // truncate file to the last reasonable length (in case there was between 1 and 3 bytes on last read)
         trunc_seek();
@@ -142,17 +203,40 @@ static void playback_game(OSContPad *pad, OSContPad *rng_pad) {
         if (!record_mode) {
             exit_game(1); // failed to complete within the evaluation time
         }
-        // printf("FINISHED READING\n");
+
+        printf("FINISHED READING\n");
     }
 }
 
 static void record_game(OSContPad *pad, OSContPad *rng_pad) {
+    // Special buttons
+
     // wait for the start button to release for at least one frame before actually registering start button presses
-    // because we use the start button for manual takeover
+    // because we use the start button for interrupting playback
     static int is_resuming = 1;
     if (!(pad->button & START_BUTTON)) {is_resuming = 0;}
     if (is_resuming) {pad->button &= ~START_BUTTON;}
 
+    //////// Use special commands from the dpad
+    if (pad->button & U_JPAD) {
+        exit_game(1);
+    }
+
+    static int d_jpad_held = 0;
+    if (pad->button & D_JPAD) {
+        d_jpad_held = 1;
+        speed = 10;
+    } else if (d_jpad_held) {
+        d_jpad_held = 0;
+        speed = 1;
+    }
+
+    // don't record dpad special buttons
+    pad->button &= ~(U_JPAD & D_JPAD & L_JPAD & R_JPAD);
+
+
+    /////////// Begin actually recording
+    
     if (rng_pad != NULL) {
         pad->button = rng_pad->button;
         pad->stick_x = rng_pad->stick_x;
@@ -188,8 +272,8 @@ static OSContPad random_pad() {
 static int is_random_action() {
     if (rng.window_cur_amount == 0) {
         // Reset the window length and random action amount
-        rng.window_cur_amount = rng.window_length_max;
-        rng.random_action_amount = rng.random_action_max;
+        rng.window_cur_amount = rng.max_window_length;
+        rng.random_action_amount = rng.max_random_action;
     }
 
     double prob_random = (double)rng.random_action_amount / (double)rng.window_cur_amount;
@@ -208,8 +292,7 @@ static void tas_read(OSContPad *pad) {
     if (fp == NULL) {
         return; // Early exit if not initialized or file is closed
     }
-
-    if (file_length >= 4*30*max_playtime_sec) {
+    if (file_length >= max_solution_bytes) {
         exit_game(1);
     }
 
@@ -220,16 +303,14 @@ static void tas_read(OSContPad *pad) {
         rng_pad_p = &rng_pad;
     }
 
+
+
+
+
     if (!is_finished_playback) {
         // This function also decides when playback ends, so we might record immediately after this
         playback_game(pad, rng_pad_p);
     }
-
-    // special command to restart game
-    if ((pad->button & L_TRIG) != 0) {
-        exit_game(1);
-    }
-
     if (is_finished_playback) {
         record_game(pad, rng_pad_p);
     }

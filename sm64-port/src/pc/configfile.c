@@ -33,7 +33,7 @@ bool configFullscreen            = false;
 // Keyboard mappings (scancode values)
 unsigned int configKeyA          = 0x17;
 unsigned int configKeyB          = 0x24;
-unsigned int configKeyStart      = 0x39;
+unsigned int configKeyStart      = 0x39; // space
 unsigned int configKeyR          = 0x36;
 unsigned int configKeyZ          = 0x18;
 unsigned int configKeyCUp        = 0x148;
@@ -44,8 +44,14 @@ unsigned int configKeyStickUp    = 0x11;
 unsigned int configKeyStickDown  = 0x1F;
 unsigned int configKeyStickLeft  = 0x1E;
 unsigned int configKeyStickRight = 0x20;
-unsigned int configKeyL          = 0x10;
 
+unsigned int configKeyL          = 0x35; // forward slash
+
+// d pad
+unsigned int configKeyJUp        = 0x13; // r
+unsigned int configKeyJDown      = 0x2a; // l shift
+unsigned int configKeyJLeft      = 0x1c; // enter
+unsigned int configKeyJRight     = 0x10; // q
 
 static const struct ConfigOption options[] = {
     {.name = "fullscreen",     .type = CONFIG_TYPE_BOOL, .boolValue = &configFullscreen},
@@ -63,6 +69,10 @@ static const struct ConfigOption options[] = {
     {.name = "key_stickdown",  .type = CONFIG_TYPE_UINT, .uintValue = &configKeyStickDown},
     {.name = "key_stickleft",  .type = CONFIG_TYPE_UINT, .uintValue = &configKeyStickLeft},
     {.name = "key_stickright", .type = CONFIG_TYPE_UINT, .uintValue = &configKeyStickRight},
+    {.name = "key_jup",        .type = CONFIG_TYPE_UINT, .uintValue = &configKeyJUp},
+    {.name = "key_jdown",      .type = CONFIG_TYPE_UINT, .uintValue = &configKeyJDown},
+    {.name = "key_jleft",      .type = CONFIG_TYPE_UINT, .uintValue = &configKeyJLeft},
+    {.name = "key_jright",     .type = CONFIG_TYPE_UINT, .uintValue = &configKeyJRight},
 };
 
 // Reads an entire line from a file (excluding the newline character) and returns an allocated string

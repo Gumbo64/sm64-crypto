@@ -27,6 +27,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use chrono::{DateTime, Local, Utc};
 
+use crate::DEFAULT_CONFIG;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BlockHead {
     pub hash: Hash,
@@ -408,7 +410,7 @@ impl BlockChain {
         Arc::clone(&self.new_block_signal)
     }
 
-    pub async fn start_mine(&self, miner_name: [u8; MAX_NAME_LENGTH]) -> Result<(Block, Arc<Mutex<bool>>)> {
+    pub async fn start_mine(&self, miner_name: [u8; DEFAULT_CONFIG.max_name_length]) -> Result<(Block, Arc<Mutex<bool>>)> {
         let mut _guard = self.db_lock.lock().await;
 
         {
@@ -450,11 +452,6 @@ impl BlockChain {
     }
 }
 
-
-// Bounded vec the solution_bytes soon
-const MAX_SOLUTION_TIME: usize = 600; // 600 seconds = 10 minutes
-const MAX_SOLUTION_BYTES: usize = MAX_SOLUTION_TIME * 30 * 4; // seconds * fps * (bytes per frame) 
-pub const MAX_NAME_LENGTH: usize = 64;
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct Block {
     prev_hash: Hash,
@@ -463,28 +460,28 @@ pub struct Block {
     // solution_bytes: Vec<u8>,
 
     #[serde(with = "serde_arrays")]
-    miner_name: [u8; MAX_NAME_LENGTH],
+    miner_name: [u8; DEFAULT_CONFIG.max_name_length],
     #[serde(with = "serde_arrays")]
-    solution_bytes: [u8; MAX_SOLUTION_BYTES],
+    solution_bytes: [u8; DEFAULT_CONFIG.max_solution_bytes],
 }
 
 impl Block {
-    pub fn new(block_head: BlockHead, miner_name: [u8; MAX_NAME_LENGTH]) -> Self {
+    pub fn new(block_head: BlockHead, miner_name: [u8; DEFAULT_CONFIG.max_name_length]) -> Self {
         let prev_hash = block_head.hash;
         let block_height = block_head.height.wrapping_add(1);
         
         let timestamp = Utc::now();
-        let tmp_solution_bytes: [u8; MAX_SOLUTION_BYTES] = [0; MAX_SOLUTION_BYTES];
+        let tmp_solution_bytes: [u8; DEFAULT_CONFIG.max_solution_bytes] = [0; DEFAULT_CONFIG.max_solution_bytes];
         Block {prev_hash, block_height, timestamp, miner_name, solution_bytes:tmp_solution_bytes}
     }
     pub fn seal(&mut self, solution_vec: Vec<u8>) {
-        assert!(solution_vec.len() <= MAX_SOLUTION_BYTES);
+        assert!(solution_vec.len() <= DEFAULT_CONFIG.max_solution_bytes);
 
-        let copy_length = solution_vec.len().min(MAX_SOLUTION_BYTES);
+        let copy_length = solution_vec.len().min(DEFAULT_CONFIG.max_solution_bytes);
         self.solution_bytes[..copy_length].copy_from_slice(&solution_vec[..copy_length]);
     }
 
-    pub fn calc_seed(&self) -> String {
+    pub fn calc_seed(&self) -> u32 {
         let mut hasher = Sha256::new();
 
         let mut x = format!("{}", self.prev_hash);
@@ -500,7 +497,9 @@ impl Block {
         hasher.update(x);
 
         let result = hasher.finalize();
-        hex::encode(result) // Convert the hash to a hex string
+        // hex::encode(result) // Convert the hash to a hex string
+        let hash_bytes = &result[..4];
+        u32::from_be_bytes(hash_bytes.try_into().expect("slice with incorrect length"))
     }
     pub fn get_solution(&self) -> Vec<u8> {
         self.solution_bytes.to_vec().clone()

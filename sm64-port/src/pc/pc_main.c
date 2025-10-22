@@ -138,11 +138,13 @@ void main_loop() {
         exit_game(0);
     }
 
+    #ifndef HEADLESS_VERSION
     #ifndef TARGET_WEB
     struct timespec ts;
     ts.tv_sec = 0;
     ts.tv_nsec = 33333333 / get_speed();
     nanosleep(&ts, &ts);
+    #endif
     #endif
 }
 
@@ -171,7 +173,7 @@ static void on_anim_frame(double time) {
         target_time = time - 0.010;
     }
 
-    while (time >= target_time) {
+    while (time >= target_time + 1.0/get_speed()) {
         main_loop();
         target_time = target_time + 1.0/get_speed();
     }
@@ -193,7 +195,7 @@ static void on_fullscreen_changed(bool is_now_fullscreen) {
 }
 
 #include <stdio.h>
-void main_func(uint32_t seed, char filename[FILENAME_MAX], int record_mode, int start_in_foreground) {
+void main_func(char filename[FILENAME_MAX], char info_filename[FILENAME_MAX], int start_in_foreground) {
 #ifdef USE_SYSTEM_MALLOC
     main_pool_init();
     gGfxAllocOnlyPool = alloc_only_pool_init();
@@ -269,7 +271,7 @@ void main_func(uint32_t seed, char filename[FILENAME_MAX], int record_mode, int 
 
     thread5_game_loop(NULL);
 
-    true_tas_init(filename, record_mode, seed);
+    true_tas_init(filename, info_filename);
 
     inited = 1;
 #ifndef TARGET_WEB
@@ -287,28 +289,28 @@ void main_func(uint32_t seed, char filename[FILENAME_MAX], int record_mode, int 
 // }
 // #else
 int main(int argc, char *argv[]) {
-    if (argc < 4) {
-        fprintf(stderr, "Usage: %s <seed> <filename> <record_mode>\n", argv[0]);
+    int start_in_foreground = 1;
+    if (argc != 3 && argc != 4) {
+        fprintf(stderr, "Usage: %s <filename> <info_filename> <start_in_foreground>\n", argv[0]);
         return 1;
     }
-
-    // Use the first command-line argument as the seed
-    uint32_t seed = (uint32_t)strtoul(argv[1], NULL, 10);
 
     // Convert filename to char[FILENAME_MAX]
     char filename[FILENAME_MAX];
-    strncpy(filename, argv[2], FILENAME_MAX);
-    // filename[FILENAME_MAX - 1] = '\0'; // Ensure null termination
+    strncpy(filename, argv[1], FILENAME_MAX);
+    char info_filename[FILENAME_MAX];
+    strncpy(info_filename, argv[2], FILENAME_MAX);
 
-    // Convert record_mode from string to integer (1 or 0)
-    int record_mode = atoi(argv[3]);
-    if (record_mode != 0 && record_mode != 1) {
-        fprintf(stderr, "Error: record_mode must be 0 or 1\n");
-        return 1;
+    // Convert start_in_foreground from string to integer (1 or 0)
+    if (argc == 4) {
+        start_in_foreground = atoi(argv[3]);
+        if (start_in_foreground != 0 && start_in_foreground != 1) {
+            fprintf(stderr, "Error: start_in_foreground must be 0 or 1\n");
+            return 1;
+        }
     }
 
-    // Call main_func with the filename and record_mode
-    main_func(seed, filename, record_mode, 1);
+    main_func(filename, info_filename, start_in_foreground);
 
     return 0;
 }

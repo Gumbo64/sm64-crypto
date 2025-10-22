@@ -18,6 +18,11 @@ extern unsigned int configKeyStickDown;
 extern unsigned int configKeyStickLeft;
 extern unsigned int configKeyStickRight;
 
+extern unsigned int configKeyJUp;
+extern unsigned int configKeyJDown;
+extern unsigned int configKeyJLeft;
+extern unsigned int configKeyJRight;
+
 void configfile_load(const char *filename);
 void configfile_save(const char *filename);
 
