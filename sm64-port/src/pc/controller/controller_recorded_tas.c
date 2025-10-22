@@ -18,18 +18,13 @@ static int is_finished_playback = 0;
 static uint32_t file_length = 0;
 static char filename[FILENAME_MAX] = "cont.m64";
 static float speed = 1;
-
-
-
+static uint32_t init_file_size = 1;
 
 
 // config info
 static uint32_t record_mode = 1;
 // 600 seconds of 1x speed gameplay
 static uint32_t max_solution_bytes = 600 * (4*30);
-
-static uint32_t init_file_size = 1;
-
 
 static float min_playback_speed = 2;
 static float max_playback_speed = 100000;

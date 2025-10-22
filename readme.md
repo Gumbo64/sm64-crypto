@@ -23,19 +23,18 @@ Progress:
 - [ ] Wallets
 - [ ] Transactions
 
-<!-- ## Controls
+## Controls
 Keyboard button - N64 Button
 * WASD - Joystick
 * I - A
 * J - B
 * O - Z
-* Enter - Start
+* Space - Start (or interrupt playback after rewinding)
+* Right Shift - R
 
 Special keys
-* R - Go back ~4 seconds in the run
-* Q - Completely restart run
-* hold Space - Change to 0.1x Speed
-* hold (Shift + Space) - Change to 10x Speed (or as fast as your computer can go) -->
+* R - Rewind back ~10 seconds in the run
+* hold Shift - Change to 10x Speed (or as fast as your computer can go)
 
 ## ./main Executable options
 Options:
