@@ -47,7 +47,6 @@ enum Command {
 }
 
 
-
 async fn mine_attempt(bc_client: &mut BlockChainClient) -> Result<()> {
     let seed = bc_client.start_mine().await?;
     let kill_signal = Arc::new(Mutex::new(false));
@@ -96,8 +95,6 @@ async fn main() -> Result<()>{
     ctrlc::set_handler(move || {
         r.store(false, Ordering::SeqCst);
     }).expect("Error setting Ctrl-C handler");
-
-
 
     println!("Starting SM64-Crypto");
 

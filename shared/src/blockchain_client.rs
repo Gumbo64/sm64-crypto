@@ -15,19 +15,11 @@ fn parse_miner_name(s: String) -> [u8; DEFAULT_CONFIG.max_name_length] {
     miner_name
 }
 
+#[derive(Debug, Clone)]
 pub struct BlockChainClient {
     bc: BlockChain,
     mining_block: Option<Block>,
     miner_name: [u8; DEFAULT_CONFIG.max_name_length],
-}
-impl Clone for BlockChainClient {
-    fn clone(&self) -> Self {
-        BlockChainClient {
-            bc: self.bc.clone(),
-            mining_block: None,
-            miner_name: self.miner_name.clone(),
-        }
-    }
 }
 
 impl BlockChainClient {
@@ -80,27 +72,11 @@ impl BlockChainClient {
     }
 
     pub async fn get_head(&self) -> Result<Block> {
-        Ok(self.bc.get_head_block_public().await?)
+        self.bc.get_head_block_public().await
     }
 
-    pub async fn get_block_head_json(&self) -> Result<String> {
-        let block = self.bc.get_head_block_public().await?;
-        Ok(serde_json::to_string_pretty(&block)?)
+    pub async fn get_block(&self, hash: Hash) -> Result<Block> {
+        self.bc.get_local_block_public(hash).await
     }
-
-    pub async fn get_block_json(&self, hash: String) -> Result<String> {
-        let hash_bytes = hash.as_bytes();
-        let l1 = hash_bytes.len();
-        let l2 = Hash::EMPTY.as_bytes().len();
-        if l1 != l2 {
-            println!("hash lengths: {} {}\n", l1, l2);
-            return Err(Error::msg("Provided hash is of the wrong length, might be whitespace"))
-        }
-        let mut array: [u8; 32] = [0u8; 32];
-        array[..hash_bytes.len()].copy_from_slice(hash_bytes);
-
-        let block = self.bc.get_local_block_public(Hash::from_bytes(array)).await?;
-        Ok(serde_json::to_string_pretty(&block)?)
-    } 
 
 }

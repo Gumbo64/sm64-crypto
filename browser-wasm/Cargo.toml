@@ -24,7 +24,10 @@ iroh-base = { version = "0.93.0", default-features = false, features = ["ticket"
 iroh-gossip = { version = "0.91.0", default-features = false, features = ["net"] }
 iroh-blobs = "0.93.0"
 n0-snafu = "0.2.1"
-tokio = { version = "1.47.1", default-features = false }
 anyhow = "1.0.100"
+
+serde_json = "1.0.145"
+
+
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["--enable-nontrapping-float-to-int", "--enable-bulk-memory"]
