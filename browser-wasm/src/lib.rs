@@ -1,25 +1,13 @@
+// use anyhow::{Result, Error};
+use anyhow::Result;
 
-use anyhow::{Result, Error};
-
-use n0_future::TryFutureExt;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber_wasm::MakeConsoleWriter;
 use wasm_bindgen::{JsError, prelude::wasm_bindgen};
-use n0_future::{
-    StreamExt,
-    boxed::BoxStream,
-    task::{self, AbortOnDropHandle},
-    time::{Duration, SystemTime},
-};
-
-use std::{
-    sync::{Arc, Mutex}
-};
-use iroh_blobs::Hash;
 
 
 use sm64_crypto_shared::{BlockChainClient};
-
+// use blake3::{hash, Hash};
 
 #[wasm_bindgen(start)]
 fn start() {
@@ -90,20 +78,20 @@ impl BlockChainClientWeb {
         Ok(serde_json::to_string_pretty(&block)?)
     }
 
-    pub async fn get_block_json(&self, hash: String) -> Result<String, JsError> {
-        let hash_bytes = hash.as_bytes();
-        let l1 = hash_bytes.len();
-        let l2 = Hash::EMPTY.as_bytes().len();
-        if l1 != l2 {
-            println!("hash lengths: {} {}\n", l1, l2);
-            return Err(Error::msg("Provided hash is of the wrong length, might be whitespace")).map_err(to_js_err);
-        }
-        let mut array: [u8; 32] = [0u8; 32];
-        array[..hash_bytes.len()].copy_from_slice(hash_bytes);
+    // pub async fn get_block_json(&self, h: String) -> Result<String, JsError> {
+    //     let hash_bytes = h.as_bytes();
+    //     let l1 = hash_bytes.len();
+    //     let l2 = hash(b"").as_bytes().len();
+    //     if l1 != l2 {
+    //         println!("hash lengths: {} {}\n", l1, l2);
+    //         return Err(Error::msg("Provided hash is of the wrong length, might be whitespace")).map_err(to_js_err);
+    //     }
+    //     let mut array: [u8; 32] = [0u8; 32];
+    //     array[..hash_bytes.len()].copy_from_slice(hash_bytes);
 
-        let block = self.client.get_block(Hash::from_bytes(array)).await.map_err(to_js_err)?;
-        Ok(serde_json::to_string_pretty(&block)?)
-    } 
+    //     let block = self.client.get_block(Hash::from_bytes(array)).await.map_err(to_js_err)?;
+    //     Ok(serde_json::to_string_pretty(&block)?)
+    // } 
 }
 
 fn to_js_err(err: impl Into<anyhow::Error>) -> JsError {

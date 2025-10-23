@@ -8,15 +8,12 @@ use anyhow::{Error, Result};
 
 use serde::{Deserialize, Serialize};
 
-use sha2::{Sha256, Digest};
-
-use distributed_topic_tracker::{AutoDiscoveryGossip, RecordPublisher, TopicId, GossipReceiver, GossipSender};
-use iroh_blobs::{api::{ downloader::{Downloader, Shuffled}, tags::Tags }, store::fs::FsStore, BlobsProtocol, Hash };
+use iroh_blobs::{api::{ downloader::{Downloader, Shuffled}, tags::Tags }, store::{fs::FsStore, mem::MemStore}, BlobsProtocol, Hash };
 use iroh::{Endpoint, PublicKey };
 use iroh_gossip::{
-    api::{Event},
+    api::{Event, GossipReceiver, GossipSender},
     net::Gossip,
-    proto::{DeliveryScope::{Neighbors, Swarm}}
+    proto::DeliveryScope::{Neighbors, Swarm}, TopicId
 };
 
 use iroh::protocol::Router;
@@ -25,6 +22,8 @@ use iroh::protocol::Router;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use chrono::{DateTime, Local, Utc};
+
+// use distributed_topic_tracker::{AutoDiscoveryGossip, RecordPublisher, TopicId};
 
 use crate::DEFAULT_CONFIG;
 
@@ -78,18 +77,18 @@ impl Clone for BlockChain {
 }
 
 impl BlockChain {
-    pub async fn new(nowait: bool) -> Result<Self> {
+    pub async fn new() -> Result<Self> {
         let endpoint = Endpoint::builder()
-            .discovery_n0()
+            // .discovery_n0()
             .bind()
             .await?;
 
         let store_path = String::from("blockchain_data");
 
         let store = FsStore::load(store_path).await.expect("failed to load fs");
-
         // let store = MemStore::new();
-        let blobs = BlobsProtocol::new(&store, endpoint.clone(), None);
+        
+        let blobs = BlobsProtocol::new(&store, None);
         let gossip = Gossip::builder().spawn(endpoint.clone());
         let tags = blobs.tags().clone();
         let downloader = store.downloader(&endpoint);
@@ -101,30 +100,12 @@ impl BlockChain {
             .spawn();
 
         // [Distributed Topic Tracker]
-        let topic_id = TopicId::new("sm64-crypto".to_string());
-        let initial_secret = b"googoo gaga".to_vec();
-        let record_publisher = RecordPublisher::new(
-            topic_id.clone(),
-            endpoint.node_id(),
-            endpoint.secret_key().secret().clone(),
-            None,
-            initial_secret,
-        );
+        let topic_id = TopicId::from_bytes(rand::random());
+        let endpoint_ids = vec![];
 
-        // A new field "subscribe_and_join_with_auto_discovery/_no_wait" 
-        // is available on iroh_gossip::net::Gossip
-        let topic;
-        if !nowait {
-            topic = gossip
-                .subscribe_and_join_with_auto_discovery(record_publisher)
-                .await.expect("Topic subscription failed");
-        } else {
-            topic = gossip
-                .subscribe_and_join_with_auto_discovery_no_wait(record_publisher)
-                .await.expect("Topic subscription failed");
-        }
+        let topic = gossip.subscribe(topic_id, endpoint_ids).await?;
 
-        let (sender, receiver)  = topic.split().await.expect("topic split failed");
+        let (sender, receiver)  = topic.split();
         println!("\n[Found peers]\n");
 
         let db_lock = Arc::new(Mutex::new(()));
@@ -137,7 +118,7 @@ impl BlockChain {
     }
 
     async fn subscribe_loop(
-        bc: BlockChain, receiver: GossipReceiver
+        bc: BlockChain, mut receiver: GossipReceiver
     ) -> Result<()> {
         {
             let _guard = bc.db_lock.lock().await;
@@ -148,7 +129,7 @@ impl BlockChain {
         bc.print_state().await?;
         while let Some(e) = receiver.next().await {
             if e.is_err() {
-                println!("error receiver");
+                println!("Received API error");
                 continue;
             }
             let event = e?;
@@ -162,7 +143,7 @@ impl BlockChain {
                     let message = BlockMessage::decode(&msg.content)?;
                     match message {
                         BlockMessage::NewBlockHead { hash } => {
-                            let peer_vec: Vec<PublicKey> = receiver.neighbors().await.into_iter().collect();   
+                            let peer_vec: Vec<PublicKey> = receiver.neighbors().into_iter().collect();   
                             match bc.new_block(hash, peer_vec.clone()).await {
                                 Ok(_) => {
                                     bc.broadcast_head().await?;
@@ -206,7 +187,6 @@ impl BlockChain {
                     String::from("Unknown")
                 }
             };
-            
 
             let converted_timestamp: DateTime<Local> = DateTime::from(head_block.timestamp);
             println!("Current height: {}\nCurrent hash: {:?}\nAt time: {:?}\nMined by: {:?}", head.height, head.hash, converted_timestamp, name);
@@ -384,8 +364,10 @@ impl BlockChain {
     async fn broadcast_block(&self, hash: Hash) -> Result<()> {
         let message = BlockMessage::NewBlockHead { hash };
         let encoded = message.encode()?.to_vec();
-        // sender.broadcast_neighbors(encoded).await?;
-        self.sender.broadcast_neighbors(encoded).await
+        match self.sender.broadcast_neighbors(encoded.into()).await {
+            Ok(_) => Ok(()),
+            Err(_e) => Err(Error::msg("broadcast_block failed"))
+        }
     }
 
     async fn broadcast_head(&self) -> Result<()> {
@@ -399,7 +381,10 @@ impl BlockChain {
     async fn request_head(&self) -> Result<()> {
         let message = BlockMessage::RequestBlockHead{};
         let encoded = message.encode()?.to_vec();
-        self.sender.broadcast_neighbors(encoded).await
+        match self.sender.broadcast_neighbors(encoded.into()).await {
+            Ok(_) => Ok(()),
+            Err(_e) => Err(Error::msg("broadcast_block failed"))
+        }
     }
 
     pub async fn start_mine(&self, miner_name: [u8; DEFAULT_CONFIG.max_name_length]) -> Result<Block> {
@@ -505,24 +490,15 @@ impl Block {
 
     pub fn calc_seed(&self) -> u32 {
         // perhaps use a different hashing algorithm later
-        let mut hasher = Sha256::new();
+        let x = format!("{}-{}-{}-{:?}", self.prev_hash, self.block_height, self.timestamp, self.miner_name);
 
-        let mut x = format!("{}", self.prev_hash);
-        hasher.update(x);
-
-        x = format!("{}", self.block_height);
-        hasher.update(x);
-
-        x = format!("{}", self.timestamp);
-        hasher.update(x);
-
-        x = format!("{:?}", self.miner_name);
-        hasher.update(x);
-
-        let result = hasher.finalize();
+        let hash: Hash = Hash::new(x.as_bytes());
         // hex::encode(result) // Convert the hash to a hex string
-        let hash_bytes = &result[..4];
-        u32::from_be_bytes(hash_bytes.try_into().expect("slice with incorrect length"))
+        let hash_bytes: &[u8; 32] = hash.as_bytes();
+
+        // Convert the first 4 bytes to `u32`
+        let value: u32 = u32::from_ne_bytes(hash_bytes[0..4].try_into().expect("Slice with incorrect length"));    
+        value
     }
     pub fn get_solution(&self) -> Vec<u8> {
         self.solution_bytes.to_vec().clone()

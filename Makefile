@@ -55,6 +55,7 @@ web-build:
 		cp $(SM64PC)/build/us_web_headless/sm64.us.js $(WEB_PROD)/sm64_headless.us.js; \
 	fi
 # 	wasm-pack build browser-wasm --release -t bundler -d $(WEB_PROD)
+	wasm-pack build browser-wasm --dev --weak-refs --reference-types -t bundler -d $(WEB_PROD)
 
 # Define a target to copy the ROM file into the SM64PC
 copy-rom:

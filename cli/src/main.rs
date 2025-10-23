@@ -1,15 +1,11 @@
 use clap::Parser;
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc};
-use tokio::time;
-use tokio::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use n0_future::{
-    StreamExt,
-    boxed::BoxStream,
     task::{self, AbortOnDropHandle},
-    time::{Duration, SystemTime},
+    // time::{Duration},
 };
 
 use anyhow::Result;
@@ -58,7 +54,7 @@ async fn mine_attempt(bc_client: &mut BlockChainClient) -> Result<()> {
         async move {
             loop {
                 if b.has_new_block().await {
-                    let mut signal = kill_signal_clone.lock().await;
+                    let mut signal = kill_signal_clone.lock().unwrap();
                     *signal = true; // Set kill_signal to true if a new block is found
                     break; // Exit the loop if a new block is detected
                 }
@@ -108,7 +104,7 @@ async fn main() -> Result<()>{
                     println!("Processed a block");
                 }
                 // Sleep for a specified duration before the next iteration
-                time::sleep(Duration::from_millis(200)).await;
+                // time::sleep(Duration::from_millis(200)).await;
             }
         }
     });
@@ -129,7 +125,7 @@ async fn main() -> Result<()>{
         }
     } else {
         loop {
-            time::sleep(time::Duration::from_secs(1)).await;
+            // time::sleep(time::Duration::from_secs(1)).await;
             // Check running state if needed
             if !running.load(Ordering::SeqCst) {
                 break; // Exit the loop if running is false

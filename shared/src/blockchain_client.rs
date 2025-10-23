@@ -23,8 +23,8 @@ pub struct BlockChainClient {
 }
 
 impl BlockChainClient {
-    pub async fn new(miner_name: String, nowait: bool) -> Result<Self> {
-        let bc= BlockChain::new(nowait).await?;
+    pub async fn new(miner_name: String, _nowait: bool) -> Result<Self> {
+        let bc= BlockChain::new().await?;
         Ok(Self {
             bc,
             mining_block: None,
