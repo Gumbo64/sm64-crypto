@@ -126,6 +126,11 @@ void true_tas_init(char supplied_filename[FILENAME_MAX], char info_filename[FILE
 
     read_info_file(info_filename);
 
+    if (record_mode == 0) {
+        // The headless version runs full speed regardless of the speed variable,
+        // so non-headless evaluation is for viewers, start to finish.
+        max_playback_speed = min_playback_speed;
+    }
 
     // Open/create the solution bytes file
     fp = fopen(filename, "rb+");
@@ -142,16 +147,7 @@ float get_speed() {
     return speed;
 }
 
-#include <math.h>  // For pow()
 float calc_speed() {
-    // double base = 1/(max_playback_speed*1.0);
-    // double power = (file_length*1.0)/(fmax(init_file_size*1.0 - 5*(30*4),1));
-    // return  min_playback_speed + max_playback_speed * pow(base, power);
-
-    // float proportion = file_length*1.0/(fmax(init_file_size*1.0 - 3*(30*4) ,1.0));
-    // float s = max_playback_speed * (1-proportion);
-    // return fmax(s,min_playback_speed);
-
     if (file_length < init_file_size - rewind_sec_amount * min_playback_speed * 4 * 30) {
         return max_playback_speed;
     }
@@ -199,7 +195,7 @@ static void playback_game(OSContPad *pad, OSContPad *rng_pad) {
             exit_game(1); // failed to complete within the evaluation time
         }
 
-        printf("FINISHED READING\n");
+        // printf("FINISHED READING\n");
     }
 }
 

@@ -1,196 +1,116 @@
-use std::{
-    collections::BTreeSet,
-    sync::{Arc, Mutex},
-};
 
-use anyhow::Result;
-use n0_future::{StreamExt, time::Duration};
-use serde::{Deserialize, Serialize};
+use anyhow::{Result, Error};
+
+use n0_future::TryFutureExt;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber_wasm::MakeConsoleWriter;
-use wasm_bindgen::{JsError, JsValue, prelude::wasm_bindgen};
-use wasm_streams::ReadableStream;
+use wasm_bindgen::{JsError, prelude::wasm_bindgen};
 
-use sm64_crypto_shared::{BlockChain, MAX_NAME_LENGTH};
+use std::{sync::Arc};
+use tokio::sync::Mutex;
 
-#[wasm_bindgen(start)]
-fn start() {
-    console_error_panic_hook::set_once();
+// use sm64_crypto_shared::{Block, BlockChain};
 
-    tracing_subscriber::fmt()
-        .with_max_level(LevelFilter::DEBUG)
-        .with_writer(
-            // To avoide trace events in the browser from showing their JS backtrace
-            MakeConsoleWriter::default().map_trace_level_to(tracing::Level::DEBUG),
-        )
-        // If we don't do this in the browser, we get a runtime error.
-        .without_time()
-        .with_ansi(false)
-        .init();
 
-    tracing::info!("(testing logging) Logging setup");
-}
+// #[wasm_bindgen(start)]
+// fn start() {
+//     console_error_panic_hook::set_once();
 
-/// Node for chatting over iroh-gossip
-#[wasm_bindgen]
-pub struct ChatNode(chat_shared::ChatNode);
+//     tracing_subscriber::fmt()
+//         .with_max_level(LevelFilter::DEBUG)
+//         .with_writer(
+//             // To avoide trace events in the browser from showing their JS backtrace
+//             MakeConsoleWriter::default().map_trace_level_to(tracing::Level::DEBUG),
+//         )
+//         // If we don't do this in the browser, we get a runtime error.
+//         .without_time()
+//         .with_ansi(false)
+//         .init();
 
-#[wasm_bindgen]
-impl ChatNode {
-    /// Spawns a gossip node.
-    pub async fn spawn() -> Result<Self, JsError> {
-        let inner = chat_shared::ChatNode::spawn(None)
-            .await
-            .map_err(to_js_err)?;
-        Ok(Self(inner))
-    }
+//     tracing::info!("(testing logging) Logging setup");
+// }
 
-    /// Returns the node id of this node.
-    pub fn node_id(&self) -> String {
-        self.0.node_id().to_string()
-    }
 
-    /// Opens a chat.
-    pub async fn create(&self, nickname: String) -> Result<Channel, JsError> {
-        // let ticket = ChatTicket::new(topic);
-        let ticket = ChatTicket::new_random();
-        self.join_inner(ticket, nickname).await
-    }
+// /// Blockchain node using Iroh
+// #[wasm_bindgen]
+// pub struct MinerInstance {
+//     bc: BlockChain,
+//     mining_block: Option<Block>,
+//     eval_request: Arc<Mutex<Option<(Block, Option<bool>)>>>,
+//     miner_name: [u8; CONFIG.max_name_length]
+// }
 
-    /// Joins a chat.
-    pub async fn join(&self, ticket: String, nickname: String) -> Result<Channel, JsError> {
-        let ticket = ChatTicket::deserialize(&ticket).map_err(to_js_err)?;
-        self.join_inner(ticket, nickname).await
-    }
+// #[wasm_bindgen]
+// impl MinerInstance {
+//     pub async fn new(miner_name: String, nowait: bool) -> Result<Self, JsError> {
+//         let (bc, eval_request, new_block_signal) = BlockChain::new(nowait)
+//             .await
+//             .map_err(to_js_err)?;
+//         Ok(Self {
+//             bc,
+//             mining_block: None,
+//             eval_request,
+//             miner_name: parse_miner_name(miner_name)
+//         })
+//     }
 
-    async fn join_inner(&self, ticket: ChatTicket, nickname: String) -> Result<Channel, JsError> {
-        let (sender, receiver) = self.0.join(&ticket, nickname).await.map_err(to_js_err)?;
-        let sender = ChannelSender(sender);
-        let neighbors = Arc::new(Mutex::new(BTreeSet::new()));
-        let neighbors2 = neighbors.clone();
-        let receiver = receiver.map(move |event| {
-            if let Ok(event) = &event {
-                match event {
-                    chat_shared::Event::Joined { neighbors } => {
-                        neighbors2.lock().unwrap().extend(neighbors.iter().cloned());
-                    }
-                    chat_shared::Event::NeighborUp { node_id } => {
-                        neighbors2.lock().unwrap().insert(*node_id);
-                    }
-                    chat_shared::Event::NeighborDown { node_id } => {
-                        neighbors2.lock().unwrap().remove(node_id);
-                    }
-                    _ => {}
-                }
-            }
-            event
-                .map_err(|err| JsValue::from(&err.to_string()))
-                .map(|event| serde_wasm_bindgen::to_value(&event).unwrap())
-        });
-        let receiver = ReadableStream::from_stream(receiver).into_raw();
+//     pub async fn start_mine(&mut self) -> Result<u32, JsError> {
+//         let block = self.bc.start_mine(self.miner_name).await.map_err(to_js_err)?;
+//         let seed = block.calc_seed();
+//         self.mining_block = Some(block);
+//         Ok(seed)
+//     }
 
-        // Add ourselves to the ticket.
-        let mut ticket = ticket;
-        ticket.bootstrap.insert(self.0.node_id());
-        // ticket.bootstrap = [self.0.node_id()].into_iter().collect();
+//     pub async fn submit_mine(&self, seed: u32, solution: Vec<u8>) -> Result<(), JsError> {
+//         match self.mining_block {
+//             Some(mut block) => {
+//                 if block.calc_seed() != seed {
+//                     return Err(Error::msg("Wrong seed")).map_err(to_js_err);
+//                 }
+//                 block.seal(solution);
+//                 self.bc.submit_mine(block).map_err(to_js_err).await
+//             }
+//             None => {
+//                 Err(Error::msg("You didn't use start_mine() first")).map_err(to_js_err)
+//             }
+//         }
+//     }
 
-        let topic = Channel {
-            topic_id: ticket.topic_id,
-            bootstrap: ticket.bootstrap,
-            neighbors,
-            me: self.0.node_id(),
-            sender,
-            receiver,
-        };
-        Ok(topic)
-    }
-}
+//     pub async fn get_eval_request(&self) -> Result<Vec<u8>, JsError> {
+//         let e_request = self.eval_request.lock().await;
+//         let (block, valid) = (*e_request).ok_or_else(|| Error::msg("eval request empty")).map_err(to_js_err)?;
+//         if valid.is_some() {
+//             return Err(Error::msg("Already responded to this request")).map_err(to_js_err)?;
+//         }
+//         let seed = block.calc_seed();
+//         let solution = block.get_solution();
 
-type ChannelReceiver = wasm_streams::readable::sys::ReadableStream;
+//         let mut result = Vec::new();
+//         result.extend(seed.to_le_bytes());
+//         result.extend(solution);
+//         Ok(result)
+//     }
 
-#[wasm_bindgen]
-pub struct Channel {
-    topic_id: TopicId,
-    me: NodeId,
-    bootstrap: BTreeSet<NodeId>,
-    neighbors: Arc<Mutex<BTreeSet<NodeId>>>,
-    sender: ChannelSender,
-    receiver: ChannelReceiver,
-}
+//     pub async fn respond_eval_request(&self, seed: u32, valid: bool) -> Result<(), JsError> {
+//         let mut e_request = self.eval_request.lock().await;
+//         let (block, _) = (*e_request).ok_or_else(|| Error::msg("eval request empty")).map_err(to_js_err)?;
+//         let b_seed = block.calc_seed();
+//         if b_seed != seed {
+//             return Err(Error::msg("eval request block changed")).map_err(to_js_err);
+//         }
+//         *e_request = Some((block, Some(valid)));
+//         Ok(())
+//     }
 
-#[wasm_bindgen]
-impl Channel {
-    #[wasm_bindgen(getter)]
-    pub fn sender(&self) -> ChannelSender {
-        self.sender.clone()
-    }
+//     pub async fn get_head_bytes(&self) -> Result<Vec<u8>, JsError> {
+//         let block = self.bc.get_head_block_public().await.map_err(to_js_err)?;
+//         Ok(block.get_solution())
+//     }
 
-    #[wasm_bindgen(getter)]
-    pub fn receiver(&mut self) -> ChannelReceiver {
-        self.receiver.clone()
-    }
-
-    pub fn ticket(&self, opts: JsValue) -> Result<String, JsError> {
-        let opts: TicketOpts = serde_wasm_bindgen::from_value(opts)?;
-        let mut ticket = ChatTicket::new(self.topic_id);
-        if opts.include_myself {
-            ticket.bootstrap.insert(self.me);
-        }
-        if opts.include_bootstrap {
-            ticket.bootstrap.extend(self.bootstrap.iter().copied());
-        }
-        if opts.include_neighbors {
-            let neighbors = self.neighbors.lock().unwrap();
-            ticket.bootstrap.extend(neighbors.iter().copied())
-        }
-        tracing::info!("opts {:?} ticket {:?}", opts, ticket);
-        Ok(ticket.serialize())
-    }
-
-    pub fn id(&self) -> String {
-        self.topic_id.to_string()
-    }
-
-    pub fn neighbors(&self) -> Vec<String> {
-        self.neighbors
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|x| x.to_string())
-            .collect()
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PeerInfo {
-    pub node_id: NodeId,
-    pub nickname: String,
-    pub last_active: Duration,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TicketOpts {
-    pub include_myself: bool,
-    pub include_bootstrap: bool,
-    pub include_neighbors: bool,
-}
-
-#[wasm_bindgen]
-#[derive(Debug, Clone)]
-pub struct ChannelSender(ChatSender);
-
-#[wasm_bindgen]
-impl ChannelSender {
-    pub async fn broadcast(&self, text: String) -> Result<(), JsError> {
-        self.0.send(text).await.map_err(to_js_err)?;
-        Ok(())
-    }
-
-    pub fn set_nickame(&self, nickname: String) {
-        self.0.set_nickname(nickname);
-    }
-}
+//     pub async fn has_new_block(&self) -> bool {
+//         self.bc.has_new_block().await
+//     }
+// }
 
 fn to_js_err(err: impl Into<anyhow::Error>) -> JsError {
     let err: anyhow::Error = err.into();

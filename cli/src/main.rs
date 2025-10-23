@@ -1,18 +1,22 @@
 use clap::Parser;
 
-use n0_snafu::Result;
-
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc};
 use tokio::time;
 use tokio::sync::Mutex;
 
+use n0_future::{
+    StreamExt,
+    boxed::BoxStream,
+    task::{self, AbortOnDropHandle},
+    time::{Duration, SystemTime},
+};
+
+use anyhow::Result;
+
 mod use_exes;
 use use_exes::{record_loop, ez_evaluate};
-use sm64_crypto_shared::{BlockChain, Block, DEFAULT_CONFIG, Config};
-
-const CONFIG: Config = DEFAULT_CONFIG;
+use sm64_crypto_shared::{BlockChainClient, DEFAULT_CONFIG};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -41,55 +45,50 @@ enum Command {
         ticket: String,
     },
 }
-    // db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>, block_eval_request: Arc<Mutex<Option<(Block, Option<bool>)>>>,
 
-fn parse_miner_name(s: String) -> [u8; CONFIG.max_name_length] {
-    let mut miner_name: [u8; CONFIG.max_name_length] = [0; CONFIG.max_name_length];
-    let vec = s;
-    assert!(vec.len() <= CONFIG.max_name_length);
-    let copy_length = vec.len().min(CONFIG.max_name_length);
-    miner_name[..copy_length].copy_from_slice(&vec.as_bytes()[..copy_length]);
-    miner_name
-}
 
-async fn mine_attempt(bc: &BlockChain, miner_name:[u8; CONFIG.max_name_length] ) -> Result<()> {
-    let (mut block, kill_signal) = bc.start_mine(miner_name).await?;
-    let seed = block.calc_seed();
-    block.seal(record_loop(seed, kill_signal, CONFIG)?);
-    bc.submit_mine(block).await?;
+
+async fn mine_attempt(bc_client: &mut BlockChainClient) -> Result<()> {
+    let seed = bc_client.start_mine().await?;
+    let kill_signal = Arc::new(Mutex::new(false));
+    let kill_signal_clone = Arc::clone(&kill_signal);
+
+    // Spawn a thread to monitor for new blocks
+    let _kill_detect_task = AbortOnDropHandle::new(task::spawn({
+        let b = bc_client.clone();
+        async move {
+            loop {
+                if b.has_new_block().await {
+                    let mut signal = kill_signal_clone.lock().await;
+                    *signal = true; // Set kill_signal to true if a new block is found
+                    break; // Exit the loop if a new block is detected
+                }
+            }
+        }
+    }));
+    let solution = record_loop(seed, kill_signal.clone(), DEFAULT_CONFIG)?;
+
+    // Submit the mining result
+    bc_client.submit_mine(seed, solution).await?;
+
     Ok(())
 }
 
-async fn process_eval_request(block_eval_request: Arc<Mutex<Option<(Block, Option<bool>)>>>) -> Option<()> {
-    let mut e_request = block_eval_request.lock().await;
-    let (block, _) = (*e_request)?;
-    let seed = block.calc_seed();
-    let solution_bytes = block.get_solution();
-    let success = ez_evaluate(seed, &solution_bytes, true, CONFIG);
-    *e_request = Some((block, Some(success)));
-    Some(())
+async fn process_eval_request(bc_client: &BlockChainClient) -> Result<()> {
+    let (seed, solution) = bc_client.get_eval_request().await?;
+    let valid = ez_evaluate(seed, solution, true, DEFAULT_CONFIG);
+    bc_client.respond_eval_request(seed, valid).await
 }
 
-async fn show_head(bc: &BlockChain) -> Result<()> {
-    let block_head = bc.get_head_public().await?;
-    let block = bc.get_local_block_public(block_head.hash).await?;
-    ez_evaluate(block.calc_seed(), &block.get_solution(), false, CONFIG);
+async fn show_head(bc_client: &BlockChainClient) -> Result<()> {
+    let block = bc_client.get_head().await?;
+    ez_evaluate(block.calc_seed(), block.get_solution(), false, DEFAULT_CONFIG);
     Ok(())
-}
-
-async fn is_new_block(sig: Arc<Mutex<bool>>) -> bool {
-    // Check if there is a new block
-    let mut nb_p = sig.lock().await;
-    if *nb_p {
-        *nb_p = false;
-        return true;
-    }
-    false
 }
 
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()>{
     tracing_subscriber::fmt::init();
     let args = Args::parse();
     let running = Arc::new(AtomicBool::new(true));
@@ -101,32 +100,32 @@ async fn main() {
 
 
     println!("Starting SM64-Crypto");
-    let miner_name = parse_miner_name(args.miner_name);
 
+    let mut bc_client = BlockChainClient::new(args.miner_name, args.nowait).await.expect("Failed to create blockchain client");
 
-    let (bc, block_eval_request) = BlockChain::new(args.nowait).await.expect("");
-
-    tokio::spawn(async move {
-        loop {
-            if !process_eval_request(block_eval_request.clone()).await.is_none() {
-                println!("Processed a block");
+    tokio::spawn({
+        let b = bc_client.clone();
+        async move {
+            loop {
+                if process_eval_request(&b).await.is_ok() {
+                    println!("Processed a block");
+                }
+                // Sleep for a specified duration before the next iteration
+                time::sleep(Duration::from_millis(200)).await;
             }
-            // Sleep for a specified duration before the next iteration
-            time::sleep(Duration::from_millis(200)).await;
-
         }
     });
 
     if args.mine {
         while running.load(Ordering::SeqCst) {
-            match mine_attempt(&bc, miner_name).await {
+            match mine_attempt(&mut bc_client).await {
                 Ok(_) => {
 
                 },
                 Err(_e) => {
                     println!("Resetting the game so we're mining from the newest block");
                     if args.showblocks {
-                        let _ = show_head(&bc).await;
+                        let _ = show_head(&bc_client).await;
                     }
                 }
             }
@@ -139,18 +138,12 @@ async fn main() {
                 break; // Exit the loop if running is false
             }
 
-            let new_block_signal = bc.get_new_block_signal();
-            if args.showblocks && is_new_block(new_block_signal).await {
-                let _ = show_head(&bc).await;
-            }
-            match show_head(&bc).await {
-                Ok(_e) => {}
-                Err(e) => {
-                    println!("{}\n",e);
-                }
+            if args.showblocks && bc_client.has_new_block().await {
+                let _ = show_head(&bc_client).await;
             }
         }
     }
 
     println!("Ending the program");
+    Ok(())
 }

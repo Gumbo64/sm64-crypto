@@ -1,6 +1,14 @@
 [workspace]
-members = [
-    "cli",
-    "shared"
-]
-resolver = "3"
+members = ["shared", "cli", "browser-wasm"]
+
+resolver="3"
+
+[workspace.dependencies]
+# we define iroh dependencies here to make upgrading easier.
+iroh = "0.91.2"
+iroh-blobs = "0.93.0"
+iroh-gossip = "0.91.0"
+iroh-base = "0.93.0"
+n0-snafu = "0.2.1"
+tokio = "1.47.1"
+anyhow = "1.0.100"

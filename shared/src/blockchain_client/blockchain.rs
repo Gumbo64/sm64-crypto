@@ -4,11 +4,9 @@ use bytes::Bytes;
 use futures_lite::StreamExt;
 
 use n0_future::task;
-use n0_snafu::{Result, ResultExt};
+use anyhow::{Error, Result};
 
 use serde::{Deserialize, Serialize};
-
-use snafu::whatever;
 
 use sha2::{Sha256, Digest};
 
@@ -23,6 +21,7 @@ use iroh_gossip::{
 
 use iroh::protocol::Router;
 // use iroh_docs::{protocol::Docs};
+// use std::sync::{Arc, Mutex};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use chrono::{DateTime, Local, Utc};
@@ -41,11 +40,11 @@ impl BlockHead {
     }
 
     fn encode(&self) -> Result<Bytes> {
-        Ok(postcard::to_stdvec(&self).e()?.into())
+        Ok(postcard::to_stdvec(&self)?.into())
     }
 
     pub fn decode(bytes: &[u8]) -> Result<BlockHead> {
-        Ok(postcard::from_bytes(bytes).e()?)
+        Ok(postcard::from_bytes(bytes)?)
     }
     
 }
@@ -61,7 +60,7 @@ impl Default for BlockHead {
 #[derive(Debug)]
 pub struct BlockChain {
     router: Router, downloader: Downloader, blobs: BlobsProtocol, tags: Tags, sender: GossipSender, 
-    db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>, block_eval_request: Arc<Mutex<Option<(Block, Option<bool>)>>>,
+    db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>, eval_request: Arc<Mutex<Option<(Block, Option<bool>)>>>,
 }
 impl Clone for BlockChain {
     fn clone(&self) -> Self {
@@ -73,13 +72,13 @@ impl Clone for BlockChain {
             sender: self.sender.clone(),
             db_lock: Arc::clone(&self.db_lock), // We need to make sure it uses this function not just .clone()
             new_block_signal: Arc::clone(&self.new_block_signal),
-            block_eval_request: Arc::clone(&self.block_eval_request),
+            eval_request: Arc::clone(&self.eval_request),
         }
     }
 }
 
 impl BlockChain {
-    pub async fn new(nowait: bool) -> Result<(BlockChain, Arc<Mutex<Option<(Block, Option<bool>)>>>)> {
+    pub async fn new(nowait: bool) -> Result<Self> {
         let endpoint = Endpoint::builder()
             .discovery_n0()
             .bind()
@@ -130,13 +129,11 @@ impl BlockChain {
 
         let db_lock = Arc::new(Mutex::new(()));
         let new_block_signal = Arc::new(Mutex::new(false));
-        
-        let block_eval_request = Arc::new(Mutex::new(None));
-        let b_e_r = Arc::clone(&block_eval_request);
+        let eval_request = Arc::new(Mutex::new(None));
 
-        let bc = BlockChain{router, downloader, blobs, tags, sender, db_lock, new_block_signal, block_eval_request};
+        let bc = BlockChain{router, downloader, blobs, tags, sender, db_lock, new_block_signal, eval_request};
         task::spawn(BlockChain::subscribe_loop(bc.clone(), receiver));
-        Ok((bc, b_e_r))
+        Ok(bc)
     }
 
     async fn subscribe_loop(
@@ -256,7 +253,7 @@ impl BlockChain {
                 let s_peers = Shuffled::new(peers);
 
                 let mut progress = self.downloader.download(hash, s_peers)
-                    .stream().await.e()?;
+                    .stream().await?;
 
                 while let Some(_event) = progress.next().await {}
                 match self.get_local_block(hash).await {
@@ -279,19 +276,19 @@ impl BlockChain {
     }
 
     async fn add_block_blob(&self, block: Block) -> Result<Hash> {
-        let encoding = block.encode().e()?;
-        let hash = self.blobs.add_bytes(encoding).await.e()?.hash;
+        let encoding = block.encode()?;
+        let hash = self.blobs.add_bytes(encoding).await?.hash;
         Ok(hash)
     }
 
     async fn temp_add_block(&self, hash: Hash) -> Result<()> {
-        let block = self.get_local_block(hash).await.e()?;
+        let block = self.get_local_block(hash).await?;
         self.tags.set( String::from("temp_") + &block.block_height.to_string(), hash).await?;
         Ok(())
     }
 
     async fn clear_temp_blocks(&self) -> Result<()> {
-        self.tags.delete_prefix(String::from("temp_")).await.e()?;
+        self.tags.delete_prefix(String::from("temp_")).await?;
         Ok(())
     }
 
@@ -301,12 +298,12 @@ impl BlockChain {
     }
 
     async fn new_block(&self, new_head_hash: Hash, peers: Vec<PublicKey>) -> Result<()> {
-        let new_head = self.get_foreign_block(new_head_hash, peers.clone()).await.e()?;
+        let new_head = self.get_foreign_block(new_head_hash, peers.clone()).await?;
 
         // check that the new block is even worth it, it should be higher than our head
-        let head = self.get_head().await.e()?;
+        let head = self.get_head().await?;
         if !head.no_blocks() && (new_head.block_height <= head.height) {
-            whatever!("New head is worse than the old one");
+            return Err(Error::msg("New head is worse than the old one"));
         }
 
         // Loop from the head downwards, validating all those blocks
@@ -321,20 +318,20 @@ impl BlockChain {
                     break;
                 }
             }
-            block = self.get_foreign_block(cur_hash, peers.clone()).await.e()?;
+            block = self.get_foreign_block(cur_hash, peers.clone()).await?;
 
             if cur_height != block.block_height {
-                whatever!("Non sequential blocks");
+                return Err(Error::msg("Non sequential blocks"));
             }
             if cur_height == 0 && block.prev_hash != Hash::EMPTY {
-                whatever!("Failed genesis block");
+                return Err(Error::msg("Failed genesis block"));
             }
 
             // Evaluate the replay
             
             // Create the request 
             if !self.evaluate_replay(block).await {
-                whatever!("Replay fail");
+                return Err(Error::msg("Replay fail"));
             }
 
             // Add this block to the temporary storage
@@ -354,7 +351,7 @@ impl BlockChain {
         }
 
         let new_blockhead = BlockHead {hash: new_head_hash, height: new_head.block_height };
-        self.set_head(new_blockhead).await.e()?;
+        self.set_head(new_blockhead).await?;
         self.clear_temp_blocks().await?;
 
         let mut new_block_signal = self.new_block_signal.lock().await;
@@ -364,33 +361,35 @@ impl BlockChain {
     }
 
     async fn evaluate_replay(&self, block: Block) -> bool {
-        {
-            let mut e_request = self.block_eval_request.lock().await;
-            *e_request = Some((block, None));
-        }
+        // Wait for e_request to be available (in case something else is evaluating at the same time)
         loop {
-            let mut e_request = self.block_eval_request.lock().await;
-            if let Some((_req_block, req_bool)) = *e_request {
-                if let Some(result) = req_bool {
-                    *e_request = None;
-                    return result;
-                }
+            let mut e_request = self.eval_request.lock().await;
+            if (*e_request).is_none() {
+                *e_request = Some((block, None));
+                break;
+            }
+        }
+
+        loop {
+            let mut e_request = self.eval_request.lock().await;
+            let (req_block, req_bool) = (*e_request).expect("Request cannot be None at this stage");
+            assert!(req_block.calc_seed() == block.calc_seed());
+            if let Some(result) = req_bool {
+                *e_request = None;
+                return result;
             }
         }
     }
 
     async fn broadcast_block(&self, hash: Hash) -> Result<()> {
         let message = BlockMessage::NewBlockHead { hash };
-        let encoded = message.encode().e()?.to_vec();
-        // sender.broadcast_neighbors(encoded).await.e()?;
-        match self.sender.broadcast_neighbors(encoded).await {
-            Ok(_) => Ok(()),
-            Err(_) => whatever!("Broadcast block fail") // Convert the error
-        }
+        let encoded = message.encode()?.to_vec();
+        // sender.broadcast_neighbors(encoded).await?;
+        self.sender.broadcast_neighbors(encoded).await
     }
 
     async fn broadcast_head(&self) -> Result<()> {
-        let head = self.get_head().await.e()?;
+        let head = self.get_head().await?;
         if head.no_blocks(){
             return Ok(());
         }
@@ -399,36 +398,28 @@ impl BlockChain {
 
     async fn request_head(&self) -> Result<()> {
         let message = BlockMessage::RequestBlockHead{};
-        let encoded = message.encode().e()?.to_vec();
-        match self.sender.broadcast_neighbors(encoded).await {
-            Ok(_) => Ok(()),
-            Err(_) => whatever!("Request head fail") // Convert the error
-        }
+        let encoded = message.encode()?.to_vec();
+        self.sender.broadcast_neighbors(encoded).await
     }
 
-    pub fn get_new_block_signal(&self) -> Arc<Mutex<bool>> {
-        Arc::clone(&self.new_block_signal)
-    }
-
-    pub async fn start_mine(&self, miner_name: [u8; DEFAULT_CONFIG.max_name_length]) -> Result<(Block, Arc<Mutex<bool>>)> {
+    pub async fn start_mine(&self, miner_name: [u8; DEFAULT_CONFIG.max_name_length]) -> Result<Block> {
         let mut _guard = self.db_lock.lock().await;
-
         {
             // If any new blocks are made while we're playing, then it will kill the recording session
             let mut new_block_signal = self.new_block_signal.lock().await;
             *new_block_signal = false;
         }
 
-        let head = self.get_head().await.e()?;
+        let head = self.get_head().await?;
 
-        Ok((Block::new(head, miner_name), self.get_new_block_signal()))
+        Ok(Block::new(head, miner_name))
     }
 
     pub async fn submit_mine(&self, new_block: Block) -> Result<()> {
         let _guard = self.db_lock.lock().await;
 
         // Add block to blobs
-        let new_hash = self.add_block_blob(new_block).await.e()?;
+        let new_hash = self.add_block_blob(new_block).await?;
 
         // You never have to download anything since you mined it locally, therefore no peers are needed
         match self.new_block(new_hash, vec![]).await {
@@ -441,11 +432,42 @@ impl BlockChain {
         Ok(())
     }
 
-    // these two have _public because we shouldn't use them in this file. because we don't want to acquire locks
-    pub async fn get_head_public(&self) -> Result<BlockHead> {
-        let _guard = self.db_lock.lock().await;
-        self.get_head().await
+
+    pub async fn get_eval_request(&self) -> Result<(u32, Vec<u8>)> {
+        let e_request = self.eval_request.lock().await;
+        let (block, valid) = (*e_request).ok_or_else(|| return Error::msg("eval request empty"))?;
+        if valid.is_some() {
+            return Err(Error::msg("Already responded to this request"))?;
+        }
+        Ok((block.calc_seed(), block.get_solution()))
     }
+
+    pub async fn respond_eval_request(&self, seed: u32, valid: bool) -> Result<()> {
+        let mut e_request = self.eval_request.lock().await;
+        let (block, _) = (*e_request).ok_or_else(|| Error::msg("eval request empty"))?;
+        if seed != block.calc_seed() {
+            return Err(Error::msg("eval request block changed"));
+        }
+        *e_request = Some((block, Some(valid)));
+        Ok(())
+    }
+
+    pub async fn has_new_block(&self) -> bool {
+        // Return true if there is a new block (aka the head has been updated)
+        let mut nb_p = self.new_block_signal.lock().await;
+        if *nb_p {
+            *nb_p = false;
+            return true;
+        }
+        false
+    }
+    // these two have _public because we shouldn't use them in this file. because we don't want to acquire locks
+    pub async fn get_head_block_public(&self) -> Result<Block> {
+        let _guard = self.db_lock.lock().await;
+        let head = self.get_head().await?;
+        self.get_local_block(head.hash).await
+    }
+
     pub async fn get_local_block_public(&self, hash: Hash) -> Result<Block> {
         let mut _guard = self.db_lock.lock().await;
         self.get_local_block(hash).await
@@ -482,6 +504,7 @@ impl Block {
     }
 
     pub fn calc_seed(&self) -> u32 {
+        // perhaps use a different hashing algorithm later
         let mut hasher = Sha256::new();
 
         let mut x = format!("{}", self.prev_hash);
@@ -506,11 +529,11 @@ impl Block {
     }
 
     fn encode(&self) -> Result<Bytes> {
-        Ok(postcard::to_stdvec(&self).e()?.into())
+        Ok(postcard::to_stdvec(&self)?.into())
     }
 
     fn decode(bytes: &[u8]) -> Result<Block> {
-        Ok(postcard::from_bytes(bytes).e()?)
+        Ok(postcard::from_bytes(bytes)?)
     }
 
 }
@@ -523,10 +546,10 @@ enum BlockMessage {
 
 impl BlockMessage {
     pub fn decode(bytes: &[u8]) -> Result<BlockMessage> {
-        Ok(postcard::from_bytes(bytes).e()?)
+        Ok(postcard::from_bytes(bytes)?)
     }
 
     fn encode(&self) -> Result<Bytes> {
-        Ok(postcard::to_stdvec(&self).e()?.into())
+        Ok(postcard::to_stdvec(&self)?.into())
     }
 }

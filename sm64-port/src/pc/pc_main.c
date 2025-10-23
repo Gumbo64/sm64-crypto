@@ -138,13 +138,11 @@ void main_loop() {
         exit_game(0);
     }
 
-    #ifndef HEADLESS_VERSION
-    #ifndef TARGET_WEB
+    #if !defined(HEADLESS_VERSION) && !defined(TARGET_WEB)
     struct timespec ts;
     ts.tv_sec = 0;
     ts.tv_nsec = 33333333 / get_speed();
     nanosleep(&ts, &ts);
-    #endif
     #endif
 }
 

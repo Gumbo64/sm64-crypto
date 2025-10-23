@@ -1,5 +1,5 @@
 [package]
-name = "chat-browser"
+name = "sm64-crypto-browser"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,8 +8,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 sm64-crypto-shared = { version = "0.1.0", path = "../shared" }
-anyhow = "1.0.86"
-chat-shared = { version = "0.1.0", path = "../shared" }
 console_error_panic_hook = "0.1.7"
 getrandom = { version = "0.2", features = ["js"] }
 n0-future = "0.1.2"
@@ -21,6 +19,12 @@ tracing-subscriber-wasm = "0.1.0"
 wasm-bindgen = "=0.2.104"
 wasm-bindgen-futures = "0.4"
 wasm-streams = "0.4.2"
-
+iroh = { version = "0.91.2", default-features = false }
+iroh-base = { version = "0.93.0", default-features = false, features = ["ticket"] }
+iroh-gossip = { version = "0.91.0", default-features = false, features = ["net"] }
+iroh-blobs = "0.93.0"
+n0-snafu = "0.2.1"
+tokio = { version = "1.47.1", default-features = false }
+anyhow = "1.0.100"
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["--enable-nontrapping-float-to-int", "--enable-bulk-memory"]

@@ -122,6 +122,6 @@ async function record_loop(seed, filename) {
     while (!success) {
         [success, starting_bytes] = await record(seed, filename, starting_bytes);
     }
-
+    return (starting_bytes);
 }
 record_loop(22, "awesome.m64");
