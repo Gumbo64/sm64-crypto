@@ -28,14 +28,14 @@ function intToUint8Array(value) {
     if (!Number.isInteger(value)) {
         throw new Error("Value must be an integer.");
     }
-    
+
     // Create a Uint8Array of length 4 (for 32-bit integers)
     const arr = new Uint8Array(4);
-    
+
     // Use DataView to set the integer at the appropriate byte position
     const view = new DataView(arr.buffer);
     view.setUint32(0, value, true); // true for little-endian format
-    
+
     return arr;
 }
 function create_info_file(game, info_filename, seed, record_mode, config) {
@@ -70,7 +70,7 @@ async function evaluate(canvas, seed, filename, solution_bytes = [], headless = 
             }
         });
     }
-    
+
     if (solution_bytes) {
         var stream = game.FS.open(filename, 'w+');
         game.FS.write(stream, solution_bytes, 0, solution_bytes.length, 0);
