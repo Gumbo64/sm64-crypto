@@ -52,19 +52,19 @@ function create_info_file(game, info_filename, seed, record_mode, config) {
     return info_filename;
 }
 
-async function evaluate(seed, filename, solution_bytes = [], headless = true) {
+async function evaluate(canvas, seed, filename, solution_bytes = [], headless = true) {
     var statusCode = NaN;
     var game;
     if (headless) {
         game = await SM64_HEADLESS({
-            "canvas": document.querySelector("#canvas"), 
+            "canvas": canvas,
             "onExit": (e) => {
                 statusCode = e;
             }
         });
     } else {
         game = await SM64({
-            "canvas": document.querySelector("#canvas"), 
+            "canvas": canvas,
             "onExit": (e) => {
                 statusCode = e;
             }
@@ -89,10 +89,10 @@ async function evaluate(seed, filename, solution_bytes = [], headless = true) {
     return success;
 }
 
-async function record(seed, filename, starting_bytes = []) {
+async function record(canvas, seed, filename, starting_bytes = []) {
     var statusCode = NaN;
     var game = await SM64({
-        "canvas": document.querySelector("#canvas"), 
+        "canvas": canvas,
         "onExit": (e) => {
             statusCode = e;
         }
@@ -119,16 +119,13 @@ async function record(seed, filename, starting_bytes = []) {
     return [success, solution_bytes];
 }
 
-async function record_loop(seed, filename) {
+async function record_loop(canvas, seed, filename) {
     var success = false;
-    //var starting_bytes = solution_22_array;
     var starting_bytes = [];
     while (!success) {
-        [success, starting_bytes] = await record(seed, filename, starting_bytes);
+        [success, starting_bytes] = await record(canvas, seed, filename, starting_bytes);
     }
     return (starting_bytes);
 }
 
-export {record_loop}
-
-record_loop(22, "awesome.m64");
+export {record_loop};

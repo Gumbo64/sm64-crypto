@@ -1,8 +1,15 @@
-import {record_loop} from "./index.js"
+import {record_loop} from "./index.js";
 
-import './App.css'
+import './App.css';
+import { useEffect } from "react";
+import { useRef } from "react";
 
 function App() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    record_loop(canvasRef.current, 22, "awesome.m64");
+  }, []);
 
   return (
     <>
@@ -78,10 +85,10 @@ function App() {
         </table>
       </div>
       <div id="container">
-        <canvas className="emscripten" id="canvas"></canvas>
+        <canvas ref={canvasRef} className="emscripten" id="canvas"></canvas>
       </div>
     </>
-  )
+  );
 }
 
-export default App
+export default App;
