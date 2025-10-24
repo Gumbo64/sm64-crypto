@@ -45,13 +45,13 @@ unsigned int configKeyStickDown  = 0x1F;
 unsigned int configKeyStickLeft  = 0x1E;
 unsigned int configKeyStickRight = 0x20;
 
-unsigned int configKeyL          = 0x35; // forward slash
+unsigned int configKeyL          = 0x10; // q
 
 // d pad
 unsigned int configKeyJUp        = 0x13; // r
 unsigned int configKeyJDown      = 0x2a; // l shift
 unsigned int configKeyJLeft      = 0x1c; // enter
-unsigned int configKeyJRight     = 0x10; // q
+unsigned int configKeyJRight     = 0x36; // r shift
 
 static const struct ConfigOption options[] = {
     {.name = "fullscreen",     .type = CONFIG_TYPE_BOOL, .boolValue = &configFullscreen},

@@ -118,10 +118,13 @@ async function record(seed, filename, starting_bytes = []) {
 
 async function record_loop(seed, filename) {
     var success = false;
-    var starting_bytes = solution_22_array;
+    // var starting_bytes = solution_22_array;
+    var starting_bytes = [];
     while (!success) {
         [success, starting_bytes] = await record(seed, filename, starting_bytes);
     }
     return (starting_bytes);
 }
+
+
 record_loop(22, "awesome.m64");

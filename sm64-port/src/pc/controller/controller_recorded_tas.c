@@ -57,8 +57,10 @@ void trunc_seek() {
     }
 }
 void exit_game(int code) {
-    trunc_seek();
-    fclose(fp);
+    if (fp != NULL) {
+        trunc_seek();
+        fclose(fp);
+    }
 
     #ifdef TARGET_WEB
     emscripten_force_exit(code);
@@ -192,7 +194,7 @@ static void playback_game(OSContPad *pad, OSContPad *rng_pad) {
         is_finished_playback = 1;
         speed = 1;
         if (!record_mode) {
-            exit_game(1); // failed to complete within the evaluation time
+            exit_game(1); // failed to win within the playback time
         }
 
         // printf("FINISHED READING\n");
@@ -209,6 +211,8 @@ static void record_game(OSContPad *pad, OSContPad *rng_pad) {
     if (is_resuming) {pad->button &= ~START_BUTTON;}
 
     //////// Use special commands from the dpad
+
+    // Replay to the same spot
     if (pad->button & U_JPAD) {
         exit_game(1);
     }

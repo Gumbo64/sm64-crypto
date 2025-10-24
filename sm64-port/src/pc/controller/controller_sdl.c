@@ -53,6 +53,8 @@ static void controller_sdl_read(OSContPad *pad) {
     }
 
     if (SDL_GameControllerGetButton(sdl_cntrl, SDL_CONTROLLER_BUTTON_START)) pad->button |= START_BUTTON;
+    if (SDL_GameControllerGetButton(sdl_cntrl, SDL_CONTROLLER_BUTTON_BACK)) pad->button |= L_TRIG;
+
     if (SDL_GameControllerGetButton(sdl_cntrl, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) pad->button |= Z_TRIG;
     if (SDL_GameControllerGetButton(sdl_cntrl, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) pad->button |= R_TRIG;
     if (SDL_GameControllerGetButton(sdl_cntrl, SDL_CONTROLLER_BUTTON_A)) pad->button |= A_BUTTON;
