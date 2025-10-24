@@ -77,7 +77,7 @@ async function evaluate(seed, filename, solution_bytes = [], headless = true) {
         game.FS.close(stream);
     }
 
-    info_filename = create_info_file(game, "info_" + filename, seed, 0, DEFAULT_CONFIG);
+    var info_filename = create_info_file(game, "info_" + filename, seed, 0, DEFAULT_CONFIG);
     game.callMain([filename, info_filename]);
 
     while (isNaN(statusCode)) {
