@@ -1,0 +1,14 @@
+body, html {
+  background-color: #000000;
+  image-rendering: pixelated;
+  scrollbar-width: none;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+canvas {
+  width: 100vw;
+  height: 100vh;
+}

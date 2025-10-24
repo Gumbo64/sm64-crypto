@@ -1,3 +1,6 @@
+import SM64 from "./assets/pkg/sm64.us.js"
+import SM64_HEADLESS from "./assets/pkg/sm64_headless.us.js"
+
 function sleep(time) {
   return new Promise((resolve) => setTimeout(resolve, time));
 }
@@ -101,7 +104,7 @@ async function record(seed, filename, starting_bytes = []) {
         game.FS.close(stream);
     }
 
-    info_filename = create_info_file(game, "info_" + filename, seed, 1, DEFAULT_CONFIG);
+    var info_filename = create_info_file(game, "info_" + filename, seed, 1, DEFAULT_CONFIG);
     game.callMain([filename, info_filename]);
 
     while (isNaN(statusCode)) {
@@ -126,5 +129,6 @@ async function record_loop(seed, filename) {
     return (starting_bytes);
 }
 
+export {record_loop}
 
 record_loop(22, "awesome.m64");
