@@ -11,8 +11,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
 
 use distributed_topic_tracker::{AutoDiscoveryGossip, RecordPublisher, TopicId, GossipReceiver, GossipSender};
-use iroh_blobs::{api::{ downloader::{Downloader, Shuffled}, tags::Tags }, store::fs::FsStore, BlobsProtocol, Hash };
-use iroh::{Endpoint, PublicKey };
+use mainline::SigningKey;
+
+use iroh_blobs::{api::{ downloader::{Downloader, Shuffled}, tags::Tags }, BlobsProtocol, Hash };
+use iroh::{Endpoint, PublicKey, SecretKey };
 use iroh_gossip::{
     api::{Event},
     net::Gossip,
@@ -79,17 +81,20 @@ impl Clone for BlockChain {
 
 impl BlockChain {
     pub async fn new(nowait: bool) -> Result<Self> {
+        let secret_key = SecretKey::generate(&mut rand::rng());
+        let signing_key = SigningKey::from_bytes(&secret_key.to_bytes());
+
         let endpoint = Endpoint::builder()
-            .discovery_n0()
+            .secret_key(secret_key.clone())
             .bind()
             .await?;
 
         let store_path = String::from("blockchain_data");
 
-        let store = FsStore::load(store_path).await.expect("failed to load fs");
-
+        let store = iroh_blobs::store::fs::FsStore::load(store_path).await.expect("failed to load fs");
         // let store = MemStore::new();
-        let blobs = BlobsProtocol::new(&store, endpoint.clone(), None);
+
+        let blobs = BlobsProtocol::new(&store, None);
         let gossip = Gossip::builder().spawn(endpoint.clone());
         let tags = blobs.tags().clone();
         let downloader = store.downloader(&endpoint);
@@ -105,8 +110,8 @@ impl BlockChain {
         let initial_secret = b"googoo gaga".to_vec();
         let record_publisher = RecordPublisher::new(
             topic_id.clone(),
-            endpoint.node_id(),
-            endpoint.secret_key().secret().clone(),
+            signing_key.verifying_key(),
+            signing_key.clone(),
             None,
             initial_secret,
         );

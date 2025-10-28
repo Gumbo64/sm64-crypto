@@ -79,4 +79,19 @@ impl BlockChainClient {
         self.bc.get_local_block_public(hash).await
     }
 
+    pub async fn get_block_from_str(&self, hash: String) -> Result<Block> {
+        let hash_bytes = hash.as_bytes();
+        let l1 = hash_bytes.len();
+        let l2 = Hash::EMPTY.as_bytes().len();
+        if l1 != l2 {
+            println!("hash lengths: {} {}\n", l1, l2);
+            return Err(Error::msg("Provided hash is of the wrong length, might be whitespace"));
+        }
+        let mut array: [u8; 32] = [0u8; 32];
+        array[..hash_bytes.len()].copy_from_slice(hash_bytes);
+
+        let block = self.get_block(Hash::from_bytes(array)).await?;
+        Ok(block)
+    }
+
 }

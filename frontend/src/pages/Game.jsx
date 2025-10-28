@@ -70,7 +70,7 @@ function Game() {
             </tr>
             <tr>
               <td>Dpad Up</td>
-              <td>Q</td>
+              <td>R</td>
               <td>Dpad Up</td>
               <td>Restart Game (and play back your inputs)</td>
             </tr>
