@@ -5,7 +5,7 @@ SM64PC = sm64-port
 RELEASE = target/release
 
 PROD = prod
-WEB_PROD = web/pkg
+WEB_PROD = frontend/src/assets/pkg
 
 RESET  = \033[0m
 RED    = \033[31m

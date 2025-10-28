@@ -1,3 +1,6 @@
+import SM64 from "./assets/pkg/sm64.us.js"
+import SM64_HEADLESS from "./assets/pkg/sm64_headless.us.js"
+
 function sleep(time) {
   return new Promise((resolve) => setTimeout(resolve, time));
 }
@@ -25,14 +28,14 @@ function intToUint8Array(value) {
     if (!Number.isInteger(value)) {
         throw new Error("Value must be an integer.");
     }
-    
+
     // Create a Uint8Array of length 4 (for 32-bit integers)
     const arr = new Uint8Array(4);
-    
+
     // Use DataView to set the integer at the appropriate byte position
     const view = new DataView(arr.buffer);
     view.setUint32(0, value, true); // true for little-endian format
-    
+
     return arr;
 }
 function create_info_file(game, info_filename, seed, record_mode, config) {
@@ -49,32 +52,32 @@ function create_info_file(game, info_filename, seed, record_mode, config) {
     return info_filename;
 }
 
-async function evaluate(seed, filename, solution_bytes = [], headless = true) {
+async function evaluate(canvas, seed, filename, solution_bytes = [], headless = true) {
     var statusCode = NaN;
     var game;
     if (headless) {
         game = await SM64_HEADLESS({
-            "canvas": document.querySelector("#canvas"), 
+            "canvas": canvas,
             "onExit": (e) => {
                 statusCode = e;
             }
         });
     } else {
         game = await SM64({
-            "canvas": document.querySelector("#canvas"), 
+            "canvas": canvas,
             "onExit": (e) => {
                 statusCode = e;
             }
         });
     }
-    
+
     if (solution_bytes) {
         var stream = game.FS.open(filename, 'w+');
         game.FS.write(stream, solution_bytes, 0, solution_bytes.length, 0);
         game.FS.close(stream);
     }
 
-    info_filename = create_info_file(game, "info_" + filename, seed, 0, DEFAULT_CONFIG);
+    var info_filename = create_info_file(game, "info_" + filename, seed, 0, DEFAULT_CONFIG);
     game.callMain([filename, info_filename]);
 
     while (isNaN(statusCode)) {
@@ -86,10 +89,10 @@ async function evaluate(seed, filename, solution_bytes = [], headless = true) {
     return success;
 }
 
-async function record(seed, filename, starting_bytes = []) {
+async function record(canvas, seed, filename, starting_bytes = []) {
     var statusCode = NaN;
     var game = await SM64({
-        "canvas": document.querySelector("#canvas"), 
+        "canvas": canvas,
         "onExit": (e) => {
             statusCode = e;
         }
@@ -101,7 +104,7 @@ async function record(seed, filename, starting_bytes = []) {
         game.FS.close(stream);
     }
 
-    info_filename = create_info_file(game, "info_" + filename, seed, 1, DEFAULT_CONFIG);
+    var info_filename = create_info_file(game, "info_" + filename, seed, 1, DEFAULT_CONFIG);
     game.callMain([filename, info_filename]);
 
     while (isNaN(statusCode)) {
@@ -116,15 +119,13 @@ async function record(seed, filename, starting_bytes = []) {
     return [success, solution_bytes];
 }
 
-async function record_loop(seed, filename) {
+async function record_loop(canvas, seed, filename) {
     var success = false;
-    // var starting_bytes = solution_22_array;
     var starting_bytes = [];
     while (!success) {
-        [success, starting_bytes] = await record(seed, filename, starting_bytes);
+        [success, starting_bytes] = await record(canvas, seed, filename, starting_bytes);
     }
     return (starting_bytes);
 }
 
-
-record_loop(22, "awesome.m64");
+export {record_loop};
