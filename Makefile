@@ -18,7 +18,7 @@ all: cli-build web-build
 
 
 # CLI Build
-cli-build:
+cli-build: copy-rom
 	@echo "$(GREEN)\nBUILDING CLI VERSION$(RESET)"
 	mkdir -p $(PROD)
 	cargo build --release
@@ -39,7 +39,7 @@ cli-build:
 # Check if Emsdk is installed
 EMSDK_PATH := $(shell which emcc)
 
-web-build:
+web-build: copy-rom
 	@echo "$(GREEN)\nBUILDING WEB VERSION$(RESET)"
 	mkdir -p $(WEB_PROD); 
 	@if [ -z "$(EMSDK_PATH)" ]; then \
