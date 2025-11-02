@@ -165,7 +165,7 @@ pub fn ez_evaluate(seed: u32, solution_bytes: Vec<u8>, headless: bool, config: C
         file.write_all(&solution_bytes).expect("");
     }
 
-    let info_file = create_info_file(seed, 1, config);
+    let info_file = create_info_file(seed, 0, config);
     let status = Command::new(sm64_path)
         .arg(filename)
         .arg(info_file.path())

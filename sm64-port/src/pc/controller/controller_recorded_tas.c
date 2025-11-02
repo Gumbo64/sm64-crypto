@@ -180,13 +180,14 @@ static void playback_game(OSContPad *pad, OSContPad *rng_pad) {
         }
 
         file_length += bytesRead;
-
-        // you are likely to restart because of the end of the run, so we should speed up the beginning part
+        
         if (record_mode) {
             speed = calc_speed();
         } else {
-            speed = max_playback_speed;
+            // still allow 10x speed button if we are in showblocks mode (evaluating but not headless)
+            if (speed < min_playback_speed) speed = min_playback_speed;
         }
+        
     } else {
         // truncate file to the last reasonable length (in case there was between 1 and 3 bytes on last read)
         trunc_seek();
@@ -209,26 +210,6 @@ static void record_game(OSContPad *pad, OSContPad *rng_pad) {
     static int is_resuming = 1;
     if (!(pad->button & START_BUTTON)) {is_resuming = 0;}
     if (is_resuming) {pad->button &= ~START_BUTTON;}
-
-    //////// Use special commands from the dpad
-
-    // Replay to the same spot
-    if (pad->button & U_JPAD) {
-        exit_game(1);
-    }
-
-    static int d_jpad_held = 0;
-    if (pad->button & D_JPAD) {
-        d_jpad_held = 1;
-        speed = 10;
-    } else if (d_jpad_held) {
-        d_jpad_held = 0;
-        speed = 1;
-    }
-
-    // don't record dpad special buttons
-    pad->button &= ~(U_JPAD & D_JPAD & L_JPAD & R_JPAD);
-
 
     /////////// Begin actually recording
     
@@ -291,16 +272,34 @@ static void tas_read(OSContPad *pad) {
         exit_game(1);
     }
 
+
+    //////// Use special commands from the dpad
+    // Replay to the same spot
+    if (pad->button & U_JPAD) {
+        exit_game(1);
+    }
+
+    // 10x speed
+    static int d_jpad_held = 0;
+    if (pad->button & D_JPAD) {
+        d_jpad_held = 1;
+        speed = 10;
+    } else if (d_jpad_held) {
+        d_jpad_held = 0;
+        speed = 1;
+    }
+
+
+    // don't record dpad special buttons
+    pad->button &= ~(U_JPAD & D_JPAD & L_JPAD & R_JPAD);
+
+
     OSContPad rng_pad;
     OSContPad* rng_pad_p = NULL;
     if (is_random_action()) {
         rng_pad = random_pad();
         rng_pad_p = &rng_pad;
     }
-
-
-
-
 
     if (!is_finished_playback) {
         // This function also decides when playback ends, so we might record immediately after this
