@@ -1,14 +1,23 @@
 import { useEffect } from "react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import {record_loop} from "../index.js";
 import './Game.css';
+import FileUpload from "../components/FileUpload.jsx";
 
 function Game() {
   const canvasRef = useRef(null);
-
-  useEffect(() => {
+  function startGame() {
     record_loop(canvasRef.current, 22, "awesome.m64");
-  }, []);
+  }
+
+  const [uploadVisible, setUploadVisible] = useState(true); // Visibility state
+  
+  const handleFileUpload = (fileName) => {
+    console.log(`Uploaded file: ${fileName}`);
+    setUploadVisible(false);
+    // You can perform additional actions here, such as updating state or making an API call.
+    startGame();
+  };
 
   return (
     <>
@@ -30,11 +39,12 @@ function Game() {
         </figure>
         <table className="table table-sm text-light" id="keyboard">
           <thead>
-            <th scope="col">N64-Controller</th>
-            <th scope="col">Keyboard</th>
-            <th scope="col">Xbox Controller (xinput)</th>
-            <th scope="col">Special Effect</th>
-
+            <tr>
+              <th scope="col">N64-Controller</th>
+              <th scope="col">Keyboard</th>
+              <th scope="col">Xbox Controller (xinput)</th>
+              <th scope="col">Special Effect</th>
+            </tr>
           </thead>
           <tbody>
             <tr>
@@ -82,6 +92,7 @@ function Game() {
             </tr>
           </tbody>
         </table>
+        {uploadVisible && <FileUpload onSuccess={handleFileUpload} />}    
       </div>
       <div id="container">
         <canvas ref={canvasRef} className="emscripten" id="canvas"></canvas>

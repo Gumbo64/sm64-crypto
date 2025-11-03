@@ -47,12 +47,12 @@ web-build: copy-rom
 	else \
 		echo "$(BLUE)\nNORMAL$(RESET)"; \
 		$(MAKE) -C $(SM64PC) -j TARGET_WEB=1; \
-		cp $(SM64PC)/build/us_web/sm64.us.wasm $(WEB_PROD)/sm64.us.wasm; \
 		cp $(SM64PC)/build/us_web/sm64.us.js $(WEB_PROD)/sm64.us.js; \
 		echo "$(BLUE)\nHEADLESS$(RESET)"; \
 		$(MAKE) -C $(SM64PC) -j TARGET_WEB=1 HEADLESS_VERSION=1; \
-		cp $(SM64PC)/build/us_web_headless/sm64.us.wasm $(WEB_PROD)/sm64_headless.us.wasm; \
 		cp $(SM64PC)/build/us_web_headless/sm64.us.js $(WEB_PROD)/sm64_headless.us.js; \
+		python3 maketools/xor.py $(SM64PC)/build/us_web/sm64.us.wasm $(WEB_PROD)/sm64.us.wasm.xor $(ROM_FILE); \
+		python3 maketools/xor.py $(SM64PC)/build/us_web_headless/sm64.us.wasm $(WEB_PROD)/sm64_headless.us.wasm.xor $(ROM_FILE); \
 	fi
 # 	wasm-pack build browser-wasm --release -t bundler -d $(WEB_PROD)
 

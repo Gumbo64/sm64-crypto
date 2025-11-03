@@ -1,6 +1,9 @@
 baserom.us.z64
 sm64.us
 sm64_headless.us
+sm64.us.wasm
+sm64_headless.us.wasm
+
 *.tmp.so
 target/
 __pycache__
@@ -16,5 +19,4 @@ prod
 prod2
 blockchain_data
 rom
-*.wasm
 *.m64

@@ -1,6 +1,8 @@
 import SM64 from "./assets/pkg/sm64.us.js"
 import SM64_HEADLESS from "./assets/pkg/sm64_headless.us.js"
 
+import { instantiateWasmSM64_HEADLESS, instantiateWasmSM64, isSM64Cached } from "./scripts/fileUpload.js"
+
 function sleep(time) {
   return new Promise((resolve) => setTimeout(resolve, time));
 }
@@ -55,20 +57,26 @@ function create_info_file(game, info_filename, seed, record_mode, config) {
 async function evaluate(canvas, seed, filename, solution_bytes = [], headless = true) {
     var statusCode = NaN;
     var game;
-    if (headless) {
-        game = await SM64_HEADLESS({
-            "canvas": canvas,
-            "onExit": (e) => {
-                statusCode = e;
-            }
-        });
+    if (await isSM64Cached()) {
+        if (headless) {
+            game = await SM64_HEADLESS({
+                "instantiateWasm": instantiateWasmSM64_HEADLESS,
+                "canvas": canvas,
+                "onExit": (e) => {
+                    statusCode = e;
+                }
+            });
+        } else {
+            game = await SM64({
+                "instantiateWasm": instantiateWasmSM64,
+                "canvas": canvas,
+                "onExit": (e) => {
+                    statusCode = e;
+                }
+            });
+        }
     } else {
-        game = await SM64({
-            "canvas": canvas,
-            "onExit": (e) => {
-                statusCode = e;
-            }
-        });
+        throw new Error("Mario 64 required to start");
     }
 
     if (solution_bytes) {
@@ -91,12 +99,20 @@ async function evaluate(canvas, seed, filename, solution_bytes = [], headless = 
 
 async function record(canvas, seed, filename, starting_bytes = []) {
     var statusCode = NaN;
-    var game = await SM64({
-        "canvas": canvas,
-        "onExit": (e) => {
-            statusCode = e;
-        }
-    });
+    var game;
+
+    if (await isSM64Cached()) {
+        game = await SM64({
+            "instantiateWasm": instantiateWasmSM64,
+            "canvas": canvas,
+            "onExit": (e) => {
+                statusCode = e;
+            }
+        });
+
+    } else {
+        throw new Error("Mario 64 required to start");
+    }
 
     if (starting_bytes) {
         var stream = game.FS.open(filename, 'w+');

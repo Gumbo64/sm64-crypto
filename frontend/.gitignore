@@ -1,6 +1,3 @@
-# PKG
-src/assets/pkg/*
-
 # Logs
 logs
 *.log
