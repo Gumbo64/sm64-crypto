@@ -8,7 +8,7 @@ function App() {
       <main>
         <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Game />}/>
+              <Route path="/sm64-crypto" element={<Game />}/>
             </Routes>
         </BrowserRouter>
       </main>

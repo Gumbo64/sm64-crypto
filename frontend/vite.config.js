@@ -5,4 +5,5 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   assetsInclude: ['**/*.xor'],
   plugins: [react()],
+  base: '/sm64-crypto',
 })
