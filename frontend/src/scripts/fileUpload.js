@@ -1,9 +1,6 @@
 import sm64XOR from '../assets/pkg/sm64.us.wasm.xor'
 import sm64_HEADLESSXOR from '../assets/pkg/sm64_headless.us.wasm.xor'
 
-// import sm64WASM from '../assets/pkg/sm64.us.wasm?url'
-// import sm64WASM_HEADLESS from '../assets/pkg/sm64_headless.us.wasm?url'
-
 async function calculateFileHash(arrayBuffer) {
     const hashBuffer = await crypto.subtle.digest('SHA-1', arrayBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -11,21 +8,30 @@ async function calculateFileHash(arrayBuffer) {
     return hashHex;
 };
 
-async function xorForWASM(key) {
-    await xorForWASMSingle(sm64XOR, "sm64.us.wasm", key);
-
-    await xorForWASMSingle(sm64_HEADLESSXOR, "sm64_headless.us.wasm", key);
+async function storeROM(romArrayBuffer) {
+    const romBuffer = new Uint8Array(romArrayBuffer);
+    await storeFile("ROM", romBuffer);
+    await updateWASMs();
+}
+async function isRomCached() {
+    const request = await getFile("ROM");;
+    return request !== undefined;
+}
+async function updateWASMs() {
+    await xorForWASMSingle(sm64XOR, "sm64.us.wasm");
+    await xorForWASMSingle(sm64_HEADLESSXOR, "sm64_headless.us.wasm");
 }
 
-async function xorForWASMSingle(wasmXOR, filename, key) {
+async function xorForWASMSingle(wasmXOR, filename) {
     // Read and XOR the input file
+    const key = await getFile("ROM");
     const inputFileResponse = await fetch(wasmXOR, { credentials: 'same-origin' });
 
     if (!inputFileResponse.ok) {
         throw new Error(`HTTP error! Status: ${inputFileResponse.status}`);
     }
 
-    const keyBuffer = new Uint8Array(key)
+    const keyBuffer = new Uint8Array(key);
     const inputFileBuffer = await inputFileResponse.arrayBuffer();
     const inputFileData = new Uint8Array(inputFileBuffer);
     const outputFileData = new Uint8Array(inputFileData.length);
@@ -34,10 +40,26 @@ async function xorForWASMSingle(wasmXOR, filename, key) {
         outputFileData[i] = inputFileData[i] ^ keyBuffer[i % keyBuffer.byteLength];
     }
     // Initialize IndexedDB
+    return storeFile(filename, outputFileData);
+};
+
+async function instantiateWasmSM64(info, func) {
+    const wasmBuffer = await getFile("sm64.us.wasm");
+    const instance = await WebAssembly.instantiate(wasmBuffer, info);
+    func(instance["instance"], instance["module"]);
+}
+async function instantiateWasmSM64_HEADLESS(info) {
+    const wasmBuffer = await getFile("sm64_headless.us.wasm");
+    const instance = await WebAssembly.instantiate(wasmBuffer, info);
+    func(instance["instance"], instance["module"]);
+}
+
+async function storeFile(filename, file) {
+    // Initialize IndexedDB
     const db = await openDatabase();
     const transaction = db.transaction('files', 'readwrite');
     const store = transaction.objectStore('files');
-    const request = store.put({ id: filename, data: outputFileData });
+    const request = store.put({ id: filename, data: file });
 
     return new Promise((resolve, reject) => {
         request.onsuccess = (event) => {
@@ -49,20 +71,9 @@ async function xorForWASMSingle(wasmXOR, filename, key) {
             reject();
         };
     });
-};
-
-async function instantiateWasmSM64(info, func) {
-    const wasmBuffer = await getWASM("sm64.us.wasm");
-    const instance = await WebAssembly.instantiate(wasmBuffer, info);
-    func(instance["instance"], instance["module"]);
-}
-async function instantiateWasmSM64_HEADLESS(info) {
-    const wasmBuffer = await getWASM("sm64_headless.us.wasm");
-    const instance = await WebAssembly.instantiate(wasmBuffer, info);
-    func(instance["instance"], instance["module"]);
 }
 
-async function getWASM(filename) {
+async function getFile(filename) {
     const db = await openDatabase();
     const transaction = db.transaction('files', 'readonly');
     const store = transaction.objectStore('files');
@@ -95,10 +106,6 @@ async function getWASM(filename) {
         };
     });
 }
-async function isSM64Cached() {
-    const request = await getWASM("sm64.us.wasm");
-    return request !== undefined;
-}
 
 // This function opens the IndexedDB database to be used in locateFile function
 async function openDatabase() {
@@ -120,4 +127,4 @@ async function openDatabase() {
 }
 
 
-export {calculateFileHash, xorForWASM, instantiateWasmSM64, instantiateWasmSM64_HEADLESS, isSM64Cached};
+export {isRomCached, calculateFileHash, storeROM, updateWASMs, instantiateWasmSM64, instantiateWasmSM64_HEADLESS};

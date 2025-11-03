@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { calculateFileHash, xorForWASM, isSM64Cached } from '../scripts/fileUpload.js'
+import { calculateFileHash, isRomCached, updateWASMs, storeROM } from '../scripts/fileUpload.js'
 
 const FileUpload = ({ onSuccess }) => {
     const [file, setFile] = useState(null);
     const [error, setError] = useState(null);
 
-    // Directly set the expected hash
+    // Directly set the expected ROM hash
     const expectedHash = '9bef1128717f958171a4afac3ed78ee2bb4e86ce';
 
     const handleFileChange = async (event) => {
@@ -18,7 +18,7 @@ const FileUpload = ({ onSuccess }) => {
             // Calculate the SHA-1 hash of the file
             const hash = await calculateFileHash(romBuffer);
             if (hash === expectedHash) {
-                await xorForWASM(romBuffer);
+                await storeROM(romBuffer);
                 if (onSuccess) {onSuccess(romFile);}
             } else {
                 setError(`Hash mismatch: expected ${expectedHash}, but got ${hash}.`);
@@ -28,7 +28,10 @@ const FileUpload = ({ onSuccess }) => {
   
     // if we already uploaded previously then skip
     useEffect(() => {
-        isSM64Cached().then(onSuccess)
+        isRomCached().then(async () => {
+            await updateWASMs();
+            onSuccess();
+        })
     }, []);
 
 

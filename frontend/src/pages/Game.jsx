@@ -13,7 +13,9 @@ function Game() {
   const [uploadVisible, setUploadVisible] = useState(true); // Visibility state
   
   const handleFileUpload = (fileName) => {
-    console.log(`Uploaded file: ${fileName}`);
+    if (fileName) {
+      console.log(`Uploaded file: ${fileName}`);
+    }
     setUploadVisible(false);
     // You can perform additional actions here, such as updating state or making an API call.
     startGame();

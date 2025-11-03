@@ -1,7 +1,7 @@
 import SM64 from "./assets/pkg/sm64.us.js"
 import SM64_HEADLESS from "./assets/pkg/sm64_headless.us.js"
 
-import { instantiateWasmSM64_HEADLESS, instantiateWasmSM64, isSM64Cached } from "./scripts/fileUpload.js"
+import { instantiateWasmSM64_HEADLESS, instantiateWasmSM64, isRomCached } from "./scripts/fileUpload.js"
 
 function sleep(time) {
   return new Promise((resolve) => setTimeout(resolve, time));
@@ -57,7 +57,8 @@ function create_info_file(game, info_filename, seed, record_mode, config) {
 async function evaluate(canvas, seed, filename, solution_bytes = [], headless = true) {
     var statusCode = NaN;
     var game;
-    if (await isSM64Cached()) {
+    
+    if (await isRomCached()) {
         if (headless) {
             game = await SM64_HEADLESS({
                 "instantiateWasm": instantiateWasmSM64_HEADLESS,
@@ -101,7 +102,7 @@ async function record(canvas, seed, filename, starting_bytes = []) {
     var statusCode = NaN;
     var game;
 
-    if (await isSM64Cached()) {
+    if (await isRomCached()) {
         game = await SM64({
             "instantiateWasm": instantiateWasmSM64,
             "canvas": canvas,
