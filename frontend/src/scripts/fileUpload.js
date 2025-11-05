@@ -14,7 +14,7 @@ async function storeROM(romArrayBuffer) {
     await updateWASMs();
 }
 async function isRomCached() {
-    const request = await getFile("ROM");;
+    const request = await getFile("ROM");
     return request !== undefined;
 }
 async function updateWASMs() {

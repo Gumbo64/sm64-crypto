@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useRef, useState } from "react";
 import {record_loop} from "../index.js";
 import './Game.css';
-import FileUpload from "../components/FileUpload.jsx";
 
 function Game() {
   const canvasRef = useRef(null);
@@ -10,16 +9,9 @@ function Game() {
     record_loop(canvasRef.current, 22, "awesome.m64");
   }
 
-  const [uploadVisible, setUploadVisible] = useState(true); // Visibility state
-  
-  const handleFileUpload = (fileName) => {
-    if (fileName) {
-      console.log(`Uploaded file: ${fileName}`);
-    }
-    setUploadVisible(false);
-    // You can perform additional actions here, such as updating state or making an API call.
+  useEffect(() => {
     startGame();
-  };
+  }, []);
 
   return (
     <>
@@ -94,7 +86,6 @@ function Game() {
             </tr>
           </tbody>
         </table>
-        {uploadVisible && <FileUpload onSuccess={handleFileUpload} />}    
       </div>
       <div id="container">
         <canvas ref={canvasRef} className="emscripten" id="canvas"></canvas>

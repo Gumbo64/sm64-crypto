@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { calculateFileHash, isRomCached, updateWASMs, storeROM } from '../scripts/fileUpload.js'
+import Loading from './Loading.jsx';
 
-const FileUpload = ({ onSuccess }) => {
+const FileUpload = ({ setHasRom }) => {
+    const [loading, setLoading] = useState(true);
     const [file, setFile] = useState(null);
     const [error, setError] = useState(null);
 
@@ -18,8 +20,9 @@ const FileUpload = ({ onSuccess }) => {
             // Calculate the SHA-1 hash of the file
             const hash = await calculateFileHash(romBuffer);
             if (hash === expectedHash) {
+                setLoading(true);
                 await storeROM(romBuffer);
-                if (onSuccess) {onSuccess(romFile);}
+                setHasRom(true);
             } else {
                 setError(`Hash mismatch: expected ${expectedHash}, but got ${hash}.`);
             }
@@ -30,19 +33,29 @@ const FileUpload = ({ onSuccess }) => {
     useEffect(() => {
         isRomCached().then(async () => {
             await updateWASMs();
-            onSuccess();
+            setHasRom(true);
+        }).catch(async () => {
+            setLoading(false);
         })
     }, []);
 
+    if (loading) {
+        return (
+            <Loading/>
+        );
+    }
 
     return (
-        <div>
-            <h1>Upload Super Mario 64 US (.z64, 8.00MB)</h1>
-            <input type="file" accept=".z64" onChange={handleFileChange} />
-            {file && <p>Selected file: {file.name}</p>}
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-            <p>Expected Hash (SHA-1): {expectedHash}</p>
-        </div>
+        <>
+            <main>
+                <div>
+                    <h1>Upload Super Mario 64 US (.z64, 8.00MB)</h1>
+                    <input type="file" accept=".z64" onChange={handleFileChange} />
+                    {error && <p style={{ color: 'red' }}>{error}</p>}
+                    <p>Expected Hash (SHA-1): {expectedHash}</p>
+                </div>
+            </main>
+        </>
     );
 };
 
