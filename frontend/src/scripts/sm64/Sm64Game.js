@@ -10,20 +10,22 @@ async function instantiateWasmSM64(info, func) {
 
 const littleEndian = true;
 
-const A_BUTTON	=0x8000
-const B_BUTTON	=0x4000
-const L_TRIG		=0x0020
-const R_TRIG		=0x0010
-const Z_TRIG		=0x2000
-const START_BUTTON	=0x1000
-const U_JPAD		=0x0800
-const L_JPAD		=0x0200
-const R_JPAD		=0x0100
-const D_JPAD		=0x0400
-const U_CBUTTONS	=0x0008
-const L_CBUTTONS	=0x0002
-const R_CBUTTONS	=0x0001
-const D_CBUTTONS	=0x0004
+class GamepadButtons {
+    static A_BUTTON = 0x8000;
+    static B_BUTTON = 0x4000;
+    static L_TRIG = 0x0020;
+    static R_TRIG = 0x0010;
+    static Z_TRIG = 0x2000;
+    static START_BUTTON = 0x1000;
+    static U_JPAD = 0x0800;
+    static L_JPAD = 0x0200;
+    static R_JPAD = 0x0100;
+    static D_JPAD = 0x0400;
+    static U_CBUTTONS = 0x0008;
+    static L_CBUTTONS = 0x0002;
+    static R_CBUTTONS = 0x0001;
+    static D_CBUTTONS = 0x0004;
+}
 
 class GamePad {
     constructor(button, stick_x, stick_y) {
@@ -52,14 +54,14 @@ class GamePad {
             view.getInt8(3),
         );
     }
-    d_jpad() {
-        return this.button & D_JPAD;
+    is_pressed(button_mask) {
+        return this.button & button_mask;
     }
-    u_jpad() {
-        return this.button & U_JPAD;
+    enable_button(button_mask) {
+        this.button |= button_mask;
     }
-    start() {
-        return this.button & START_BUTTON;
+    disable_button(button_mask) {
+        this.button &= ~button_mask;
     }
 }
 
@@ -173,7 +175,7 @@ class Sm64VisualEngine {
         let pointer = this.game._rng_pad(pad.button, pad.stick_x, pad.stick_y);
         return GamePad.from_pointer(pointer, this);
     }
-    
+
     get_mario_state() {
         let pointer = this.game._get_mario_state();
         const view = new DataView(this.mem_slice(pointer, 0x3C + 12));
@@ -218,4 +220,4 @@ class Sm64VisualEngine {
 
 }
 
-export default Sm64VisualEngine;
+export {Sm64VisualEngine, GamePad, GamepadButtons};

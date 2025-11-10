@@ -1,4 +1,4 @@
-import Sm64VisualEngine from "./scripts/sm64/Sm64Game.js";
+import { Sm64VisualEngine, GamepadButtons } from "./scripts/sm64/Sm64Game";
 
 function sleep(time) {
   return new Promise((resolve) => setTimeout(resolve, time));
@@ -80,11 +80,11 @@ async function playback(canvas, inputs, seed=NaN, controllable=false, min_speed=
         if (controllable) {
             // allow special inputs
             let c_pad = engine.get_controller_pad();
-            if (c_pad.start()) {
+            if (c_pad.is_pressed(GamepadButtons.START_BUTTON)) {
                 inputs.length = i;
                 return true;
             }
-            let cut_amount = 10 * min_speed * 30 // 5 seconds before
+            let cut_amount = 10 * min_speed * 30 // 10 seconds before
             if (inputs.length - cut_amount < i) {
                 speed = min_speed;
             }
@@ -105,11 +105,23 @@ async function record(canvas, seed=NaN, starting_bytes = []) {
 
     let solution_bytes = Array.from(starting_bytes); // shallow copy, use the same pad objects but different array
 
+    let cancel_start_press = true;
+
     let speed = 1;
     function get_speed() {return speed}
 
     function step() {
         let c_pad = engine.get_controller_pad();
+
+        // don't press start again after interrupting playback, unless it has released for at least one frame
+        if (cancel_start_press) {
+            if (c_pad.is_pressed(GamepadButtons.START_BUTTON)) {
+                c_pad.disable_button(GamepadButtons.START_BUTTON)
+            } else {
+                cancel_start_press = false;
+            }
+        }
+
         // true controller pad, other pad can change via RNG
 
         let pad = c_pad;
@@ -127,11 +139,11 @@ async function record(canvas, seed=NaN, starting_bytes = []) {
             return true;
         }
 
-        if (c_pad.u_jpad() ) {
+        if (c_pad.is_pressed(GamepadButtons.U_JPAD)) {
             return true;
         }
 
-        if (c_pad.d_jpad()) {
+        if (c_pad.is_pressed(GamepadButtons.D_JPAD)) {
             speed = 10;
             engine.set_audio_enabled(0);
         } else {
