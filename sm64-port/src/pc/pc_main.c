@@ -62,7 +62,6 @@ void set_vblank_handler(UNUSED s32 index, UNUSED struct VblankHandler *handler, 
 }
 
 
-
 static uint8_t inited = 0;
 
 #include "game/game_init.h" // for gGlobalTimer
@@ -83,11 +82,13 @@ void exec_display_list(struct SPTask *spTask) {
 #define SAMPLES_LOW 528
 #endif
 
+static int audio_enabled = 1;
+
 void produce_one_frame(void) {
     gfx_start_frame();
     game_loop_one_iteration();
     
-    if (get_speed() == 1) {
+    if (audio_enabled) {
         int samples_left = audio_api->buffered();
         u32 num_audio_samples = samples_left < audio_api->get_desired_buffered() ? SAMPLES_HIGH : SAMPLES_LOW;
         //printf("Audio samples: %d %u\n", samples_left, num_audio_samples);
@@ -103,86 +104,8 @@ void produce_one_frame(void) {
         audio_api->play((u8 *)audio_buffer, 2 * num_audio_samples * 4);
     }
 
-    
     gfx_end_frame();
 }
-#include "game/level_update.h"
-#include "game/camera.h"
-bool has_won() {
-    return gMarioState->numStars > 0;
-}
-
-#ifndef TARGET_WEB
-#include <time.h>
-#endif
-
-#include <string.h>
-
-
-void update_seed() {
-    rng_update(rng_next() ^ (uint32_t)gMarioState->pos[0]);
-    rng_update(rng_next() ^ (uint32_t)gMarioState->pos[1]);
-    rng_update(rng_next() ^ (uint32_t)gMarioState->pos[2]);
-    rng_update(rng_next() ^ (uint32_t)gMarioState->vel[0]);
-    rng_update(rng_next() ^ (uint32_t)gMarioState->vel[1]);
-    rng_update(rng_next() ^ (uint32_t)gMarioState->vel[2]);
-    
-    rng_update(rng_next());
-}
-
-void main_loop() {
-    update_seed();
-
-    produce_one_frame();
-    if (has_won()) {
-        exit_game(0);
-    }
-
-    #if !defined(HEADLESS_VERSION) && !defined(TARGET_WEB)
-    struct timespec ts;
-    ts.tv_sec = 0;
-    ts.tv_nsec = 33333333 / get_speed();
-    nanosleep(&ts, &ts);
-    #endif
-}
-
-#ifdef TARGET_WEB
-static void em_main_loop(void) {}
-
-static void request_anim_frame(void (*func)(double time)) {
-    EM_ASM(MainLoop.requestAnimationFrame(function(time) {
-        dynCall("vd", $0, [time]);
-    }), func);
-
-    // EM_ASM(setTimeout(function() {
-    //     dynCall("vd", $0, [Date.now()]);
-    // }, 10), func);
-
-}
-
-static void on_anim_frame(double time) {
-    static double target_time = 0;
-
-    time *= 0.03; // milliseconds to frame count (33.333 ms -> 1)
-
-    if (time >= target_time + 10.0) {
-        // We are lagging 10 frames behind, probably due to coming back after inactivity,
-        // so reset, with a small margin to avoid potential jitter later.
-        target_time = time - 0.010;
-    }
-
-    while (time >= target_time + 1.0/get_speed()) {
-        main_loop();
-        target_time = target_time + 1.0/get_speed();
-    }
-
-    // for (int i = 0; i < get_speed(); i++) {
-    //     main_loop();
-    // }
-
-    request_anim_frame(on_anim_frame);
-}
-#endif
 
 static void save_config(void) {
     configfile_save(CONFIG_FILE);
@@ -193,7 +116,7 @@ static void on_fullscreen_changed(bool is_now_fullscreen) {
 }
 
 #include <stdio.h>
-void main_func(char filename[FILENAME_MAX], char info_filename[FILENAME_MAX], int start_in_foreground) {
+void main_func() {
 #ifdef USE_SYSTEM_MALLOC
     main_pool_init();
     gGfxAllocOnlyPool = alloc_only_pool_init();
@@ -205,11 +128,6 @@ void main_func(char filename[FILENAME_MAX], char info_filename[FILENAME_MAX], in
 
     configfile_load(CONFIG_FILE);
     atexit(save_config);
-
-#ifdef TARGET_WEB
-    emscripten_set_main_loop(em_main_loop, 0, 0);
-    request_anim_frame(on_anim_frame);
-#endif
 
 #if defined(HEADLESS_VERSION)
     rendering_api = &gfx_dummy_renderer_api;
@@ -230,7 +148,7 @@ void main_func(char filename[FILENAME_MAX], char info_filename[FILENAME_MAX], in
     #endif
 #endif
 #endif
-    gfx_init(wm_api, rendering_api, "Super Mario 64 PC-Port", configFullscreen, start_in_foreground);
+    gfx_init(wm_api, rendering_api, "Super Mario 64 PC-Port", configFullscreen, 1);
     
     wm_api->set_fullscreen_changed_callback(on_fullscreen_changed);
     wm_api->set_keyboard_callbacks(keyboard_on_key_down, keyboard_on_key_up, keyboard_on_all_keys_up);
@@ -269,97 +187,77 @@ void main_func(char filename[FILENAME_MAX], char info_filename[FILENAME_MAX], in
 
     thread5_game_loop(NULL);
 
-    true_tas_init(filename, info_filename);
-
     inited = 1;
-#ifndef TARGET_WEB
-    while (1) {
-        wm_api->main_loop(main_loop);
-    }
-#endif
 }
 
-// #if defined(_WIN32) || defined(_WIN64)
-// #include <windows.h>
-// int WINAPI WinMain(UNUSED HINSTANCE hInstance, UNUSED HINSTANCE hPrevInstance, UNUSED LPSTR pCmdLine, UNUSED int nCmdShow) {
-//     main_func(1);
-//     return 0;
-// }
-// #else
-int main(int argc, char *argv[]) {
-    int start_in_foreground = 1;
-    if (argc != 3 && argc != 4) {
-        fprintf(stderr, "Usage: %s <filename> <info_filename> <start_in_foreground>\n", argv[0]);
-        return 1;
-    }
-
-    // Convert filename to char[FILENAME_MAX]
-    char filename[FILENAME_MAX];
-    strncpy(filename, argv[1], FILENAME_MAX);
-    char info_filename[FILENAME_MAX];
-    strncpy(info_filename, argv[2], FILENAME_MAX);
-
-    // Convert start_in_foreground from string to integer (1 or 0)
-    if (argc == 4) {
-        start_in_foreground = atoi(argv[3]);
-        if (start_in_foreground != 0 && start_in_foreground != 1) {
-            fprintf(stderr, "Error: start_in_foreground must be 0 or 1\n");
-            return 1;
-        }
-    }
-
-    main_func(filename, info_filename, start_in_foreground);
-
-    return 0;
+int main() {
+    main_func();
 }
-// #endif
+
+
+// EXPORTED FUNCTIONS
+
+// main_func
+// 
+
+#include "game/level_update.h"
+#include "game/camera.h"
+
+#include "random_action.h"
+#include "controller/controller_recorded_tas.h"
+
+void update_seed() {
+    rng_update((uint32_t)gMarioState->pos[0]);
+    rng_update((uint32_t)gMarioState->pos[1]);
+    rng_update((uint32_t)gMarioState->pos[2]);
+    rng_update((uint32_t)gMarioState->vel[0]);
+    rng_update((uint32_t)gMarioState->vel[1]);
+    rng_update((uint32_t)gMarioState->vel[2]);
+}
 
 // #include "controller/controller.h"
 
-#include <PR/os_cont.h>
 
-void set_controller(int stickX, int stickY, int button) {
-    OSContPad *controller = &gControllerPads[0];
-
-    controller->stick_x = stickX;
-    controller->stick_y = stickY;
-    // keyboard_on_key_down, keyboard_on_key_up, keyboard_on_all_keys_up
-    controller->button = button;
+void step_game(uint16_t button, uint8_t stick_x, uint8_t stick_y) {
+    set_tas_controller(button, stick_x, stick_y);
+    produce_one_frame();
+    update_seed();
 }
 
-
-
-void step_game(int steps, int stickX, int stickY, int button) {
-    for (int i = 0; i < steps; i++) {
-        set_controller(stickX, stickY, button);
-        produce_one_frame();
-    }
+void set_audio_enabled(int t) {
+    audio_enabled = t;
 }
 
 struct MarioState *get_mario_state() {
     return gMarioState;
 }
 
-struct GameInfo {
-    bool inCredits;
-    s16 courseNum;
-    s16 actNum;
-    s16 areaIndex;
+// just make them all s32, something wrong with reading otherwise
+struct GameState {
+    s32 numStars;
+    Vec3f pos;
+    Vec3f vel;
+    Vec3f lakituPos;
+    s32 lakituYaw;
+    s32 inCredits;
+    s32 courseNum;
+    s32 actNum;
+    s32 areaIndex;
 };
 
-struct GameInfo get_game_info() {
-    struct GameInfo info = {
-        .inCredits = gCurrCreditsEntry != NULL,
-        .courseNum = gCurrCourseNum,
-        .actNum = gCurrActNum,
-        .areaIndex = gCurrAreaIndex,
-    };
-    return info;
-}
+struct GameState *get_game_state() {
+    static struct GameState info;
+    info.numStars = gMarioState->numStars;
+    info.inCredits = gCurrCreditsEntry != NULL;
+    info.courseNum = gCurrCourseNum;
+    info.actNum = gCurrActNum;
+    info.areaIndex = gCurrAreaIndex;
+    info.lakituYaw = gLakituState.yaw;
 
-Vec3f *get_lakitu_pos() {
-    return &gLakituState.pos;
-}
-s16 get_lakitu_yaw() {
-    return gLakituState.yaw;
+    for (int i = 0; i < 3; i++) {
+        info.pos[i] = gMarioState->pos[i];
+        info.vel[i] = gMarioState->vel[i];
+        info.lakituPos[i] = gLakituState.pos[i];
+    }
+    return &info;
 }

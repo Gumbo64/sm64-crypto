@@ -6,7 +6,9 @@ import './Game.css';
 function Game() {
   const canvasRef = useRef(null);
   function startGame() {
-    record_loop(canvasRef.current, 22, "awesome.m64");
+    record_loop(canvasRef.current, 22);
+    // test(canvasRef.current);
+
   }
 
   useEffect(() => {

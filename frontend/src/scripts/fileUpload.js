@@ -1,5 +1,5 @@
-import sm64XOR from '../assets/pkg/sm64.us.wasm.xor'
-import sm64_HEADLESSXOR from '../assets/pkg/sm64_headless.us.wasm.xor'
+import sm64XOR from '../../../WASM_XOR/sm64.us.wasm.xor'
+import sm64_HEADLESSXOR from '../../../WASM_XOR/sm64_headless.us.wasm.xor'
 
 async function calculateFileHash(arrayBuffer) {
     const hashBuffer = await crypto.subtle.digest('SHA-1', arrayBuffer);
@@ -42,17 +42,6 @@ async function xorForWASMSingle(wasmXOR, filename) {
     // Initialize IndexedDB
     return storeFile(filename, outputFileData);
 };
-
-async function instantiateWasmSM64(info, func) {
-    const wasmBuffer = await getFile("sm64.us.wasm");
-    const instance = await WebAssembly.instantiate(wasmBuffer, info);
-    func(instance["instance"], instance["module"]);
-}
-async function instantiateWasmSM64_HEADLESS(info) {
-    const wasmBuffer = await getFile("sm64_headless.us.wasm");
-    const instance = await WebAssembly.instantiate(wasmBuffer, info);
-    func(instance["instance"], instance["module"]);
-}
 
 async function storeFile(filename, file) {
     // Initialize IndexedDB
@@ -110,7 +99,7 @@ async function getFile(filename) {
 // This function opens the IndexedDB database to be used in locateFile function
 async function openDatabase() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open('wasmDB', 1);
+        const request = indexedDB.open('SM64_LIB_WASM_DB', 1);
 
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
@@ -127,4 +116,4 @@ async function openDatabase() {
 }
 
 
-export {isRomCached, calculateFileHash, storeROM, updateWASMs, instantiateWasmSM64, instantiateWasmSM64_HEADLESS};
+export {isRomCached, calculateFileHash, storeROM, updateWASMs, getFile};

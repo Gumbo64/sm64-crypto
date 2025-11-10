@@ -4,6 +4,8 @@ sm64_headless.us
 sm64.us.wasm
 sm64_headless.us.wasm
 
+WASM
+
 *.tmp.so
 target/
 __pycache__

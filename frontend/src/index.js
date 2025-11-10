@@ -1,146 +1,157 @@
-import SM64 from "./assets/pkg/sm64.us.js"
-import SM64_HEADLESS from "./assets/pkg/sm64_headless.us.js"
-
-import { instantiateWasmSM64_HEADLESS, instantiateWasmSM64, isRomCached } from "./scripts/fileUpload.js"
+import Sm64VisualEngine from "./scripts/sm64/Sm64Game.js";
 
 function sleep(time) {
   return new Promise((resolve) => setTimeout(resolve, time));
 }
 
-const MAX_NAME_LENGTH = 64;
-const MAX_SOLUTION_TIME = 600; // 600 seconds = 10 minutes
-const MAX_WINDOW_LENGTH = 100;
-const MAX_RANDOM_ACTION = 5;
-
-const MAX_SOLUTION_BYTES = MAX_SOLUTION_TIME * 30 * 4; // seconds * fps * (bytes per frame) 
-
-function make_config(max_name_length, max_solution_bytes, max_window_length, max_random_action) {
-    return {
-        "max_name_length": max_name_length,
-        "max_solution_bytes": max_solution_bytes,
-        "max_window_length": max_window_length,
-        "max_random_action": max_random_action,
-    }
-}
-
-const DEFAULT_CONFIG = make_config(MAX_NAME_LENGTH, MAX_SOLUTION_BYTES, MAX_WINDOW_LENGTH, MAX_RANDOM_ACTION)
-
-function intToUint8Array(value) {
-    // Ensure the value is an integer
-    if (!Number.isInteger(value)) {
-        throw new Error("Value must be an integer.");
-    }
-
-    // Create a Uint8Array of length 4 (for 32-bit integers)
-    const arr = new Uint8Array(4);
-
-    // Use DataView to set the integer at the appropriate byte position
-    const view = new DataView(arr.buffer);
-    view.setUint32(0, value, true); // true for little-endian format
-
-    return arr;
-}
-function create_info_file(game, info_filename, seed, record_mode, config) {
-    var stream = game.FS.open(info_filename, 'w+');
-
-    game.FS.write(stream, intToUint8Array(seed), 0, 4);
-    game.FS.write(stream, intToUint8Array(record_mode), 0, 4);
-
-    game.FS.write(stream, intToUint8Array(config["max_solution_bytes"]), 0, 4);
-    game.FS.write(stream, intToUint8Array(config["max_window_length"]), 0, 4);
-    game.FS.write(stream, intToUint8Array(config["max_random_action"]), 0, 4);
-
-    game.FS.close(stream);
-    return info_filename;
-}
-
-async function evaluate(canvas, seed, filename, solution_bytes = [], headless = true) {
-    var statusCode = NaN;
-    var game;
-    
-    if (await isRomCached()) {
-        if (headless) {
-            game = await SM64_HEADLESS({
-                "instantiateWasm": instantiateWasmSM64_HEADLESS,
-                "canvas": canvas,
-                "onExit": (e) => {
-                    statusCode = e;
-                }
-            });
-        } else {
-            game = await SM64({
-                "instantiateWasm": instantiateWasmSM64,
-                "canvas": canvas,
-                "onExit": (e) => {
-                    statusCode = e;
-                }
-            });
+async function iter_with_anim_frame(func, get_speed) {
+    let done = false;
+    let target_time = 0;
+    const loop = (time) => {
+        time *= 0.03; // milliseconds to frame count (33.333 ms -> 1)
+        if (time >= target_time + 100.0) {
+            // We are lagging 100 frames behind, probably due to coming back after inactivity,
+            // so reset, with a small margin to avoid potential jitter later.
+            target_time = time - 0.010;
         }
-    } else {
-        throw new Error("Mario 64 required to start");
+        while (time >= target_time + 1.0/get_speed()) {
+            done = func();
+            if (done) return;
+            target_time = target_time + 1.0/get_speed();
+        }
+        requestAnimationFrame(loop);
     }
+    requestAnimationFrame(loop);
+    
 
-    if (solution_bytes) {
-        var stream = game.FS.open(filename, 'w+');
-        game.FS.write(stream, solution_bytes, 0, solution_bytes.length, 0);
-        game.FS.close(stream);
-    }
+    return new Promise((resolve) => {
+        const checkEndCondition = () => {
+            if (done) {
+                resolve();
+            } else {
+                setTimeout(checkEndCondition, 100); // Polling every 100ms to check end conditions
+            }
+        };
+        checkEndCondition();
+    });
+}
 
-    var info_filename = create_info_file(game, "info_" + filename, seed, 0, DEFAULT_CONFIG);
-    game.callMain([filename, info_filename]);
-
-    while (isNaN(statusCode)) {
-        await sleep(500);
-    }
-    // execution is finished
-
-    var success = statusCode == 0;
+async function evaluate(canvas, seed, solution_bytes = []) {
+    let [_, success] = playback(canvas, solution_bytes, seed)[1];
     return success;
 }
 
-async function record(canvas, seed, filename, starting_bytes = []) {
-    var statusCode = NaN;
-    var game;
-
-    if (await isRomCached()) {
-        game = await SM64({
-            "instantiateWasm": instantiateWasmSM64,
-            "canvas": canvas,
-            "onExit": (e) => {
-                statusCode = e;
-            }
-        });
-
+async function playback(canvas, inputs, seed=NaN, controllable=false, min_speed=2, max_speed=10000) {
+    let success = false;
+    let engine;
+    if (isNaN(seed)) {
+        engine = await Sm64VisualEngine.create(canvas, 22);
     } else {
-        throw new Error("Mario 64 required to start");
+        engine = await Sm64VisualEngine.create(canvas, seed);
     }
+    let speed = max_speed;
+    function get_speed() {return speed}
+    engine.set_audio_enabled(0);
 
-    if (starting_bytes) {
-        var stream = game.FS.open(filename, 'w+');
-        game.FS.write(stream, starting_bytes, 0, starting_bytes.length, 0);
-        game.FS.close(stream);
+
+    // Loop through all frames
+    let i = 0;
+    function step() {
+        if (i >= inputs.length) return true;
+        let pad = inputs[i];
+        i+=1;
+
+        // assert that the playback matches the seed
+        let r_pad = engine.rng_pad(pad);
+        if (!isNaN(seed) && !pad.equals(r_pad)) {
+            throw new Error("Replay inputs do not match seed")
+        }
+        
+        // playback
+        engine.step_game(pad);
+
+        // check if won
+        let state = engine.get_game_state();
+        if (state.hasWon()) {
+            success = true;
+            return true;
+        }
+
+        if (controllable) {
+            // allow special inputs
+            let c_pad = engine.get_controller_pad();
+            if (c_pad.start()) {
+                inputs.length = i;
+                return true;
+            }
+            let cut_amount = 10 * min_speed * 30 // 5 seconds before
+            if (inputs.length - cut_amount < i) {
+                speed = min_speed;
+            }
+        }
+
+        return false;
     }
-
-    var info_filename = create_info_file(game, "info_" + filename, seed, 1, DEFAULT_CONFIG);
-    game.callMain([filename, info_filename]);
-
-    while (isNaN(statusCode)) {
-        await sleep(500);
-    }
-    // execution is finished
-
-    var success = statusCode == 0;
-    var solution_bytes = game.FS.open(filename).node.contents;
-    console.log(success);
-    console.log(solution_bytes);
-    return [success, solution_bytes];
+    
+    await iter_with_anim_frame(step, get_speed);
+    engine.set_audio_enabled(1);
+    return [engine, success];
 }
 
-async function record_loop(canvas, seed, filename) {
+
+async function record(canvas, seed=NaN, starting_bytes = []) {
+    let [engine, success] = await playback(canvas, starting_bytes, seed, true);
+    if (success) return [success, solution_bytes];
+
+    let solution_bytes = Array.from(starting_bytes); // shallow copy, use the same pad objects but different array
+
+    let speed = 1;
+    function get_speed() {return speed}
+
+    function step() {
+        let c_pad = engine.get_controller_pad();
+        // true controller pad, other pad can change via RNG
+
+        let pad = c_pad;
+        if (!isNaN(seed)) pad = engine.rng_pad(pad);
+        
+        engine.step_game(pad);
+        solution_bytes.push(pad);
+
+        let state = engine.get_game_state();
+        // console.log(state.toString());
+
+        // check if won
+        if (state.hasWon()) {
+            success = true;
+            return true;
+        }
+
+        if (c_pad.u_jpad() ) {
+            return true;
+        }
+
+        if (c_pad.d_jpad()) {
+            speed = 10;
+            engine.set_audio_enabled(0);
+        } else {
+            speed = 1;
+            engine.set_audio_enabled(1);
+        }
+        return false;
+    }
+    
+    await iter_with_anim_frame(step, get_speed);
+
+    return [success, solution_bytes];
+
+}
+
+async function record_loop(canvas, seed) {
     var success = false;
     var starting_bytes = [];
     while (!success) {
-        [success, starting_bytes] = await record(canvas, seed, filename, starting_bytes);
+        [success, starting_bytes] = await record(canvas, seed, starting_bytes);
     }
     return (starting_bytes);
 }

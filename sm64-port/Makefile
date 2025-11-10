@@ -294,7 +294,11 @@ ifeq ($(HEADLESS_VERSION), 1)
 endif
 
 ifeq ($(TARGET_WEB),1)
-  EXE := $(BUILD_DIR)/$(TARGET).js
+  ifeq ($(HEADLESS_VERSION), 1)
+    EXE := $(BUILD_DIR)/$(TARGET).wasm
+  else
+    EXE := $(BUILD_DIR)/$(TARGET).js
+  endif
 else ifeq ($(TARGET_WINDOWS),1)
   EXE := $(BUILD_DIR)/$(TARGET).exe
 else
@@ -504,12 +508,11 @@ endif
 ifeq ($(TARGET_WEB),1)
 
   PLATFORM_CFLAGS  := -DTARGET_WEB -fPIC
-#   PLATFORM_LDFLAGS := -lm -no-pie -s TOTAL_MEMORY=20MB -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_FUNCTIONS=_main_func,_step_game,_get_mario_state,_get_game_info,_get_lakitu_pos,_get_lakitu_yaw,_end
-  PLATFORM_LDFLAGS := -lm -no-pie -sUSE_SDL=2 -sEXPORT_ES6 -sTOTAL_MEMORY=20MB -sINVOKE_RUN=0 -sNO_EXIT_RUNTIME=0 -sFULL_ES2 -sFULL_ES3 -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_RUNTIME_METHODS=callMain,abort,FS
+  PLATFORM_LDFLAGS := -lm -no-pie -sTOTAL_MEMORY=20MB -gsource-map --source-map-base http://localhost:3000/ -sEXPORTED_FUNCTIONS=_main_func,_step_game,_rng_init,_rng_pad,_get_controller_pad,_get_game_state,_get_mario_state,_set_audio_enabled
   ifeq ($(HEADLESS_VERSION), 1)
-    PLATFORM_LDFLAGS += -sEXPORT_NAME=SM64_HEADLESS
+    PLATFORM_LDFLAGS += -sPURE_WASI=1
   else
-    PLATFORM_LDFLAGS += -sEXPORT_NAME=SM64
+    PLATFORM_LDFLAGS += -sEXPORT_NAME=SM64_LIB -sALLOW_MEMORY_GROWTH=1 -sIMPORTED_MEMORY=1 -sUSE_SDL=2 -sEXPORT_ES6 -sINVOKE_RUN=0 -sNO_EXIT_RUNTIME=0 -sFULL_ES2 -sFULL_ES3 -sEXPORTED_RUNTIME_METHODS=wasmMemory
   endif
 
 #   -sEXPORTED_RUNTIME_METHODS=callMain -sALLOW_MEMORY_GROWTH
