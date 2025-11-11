@@ -63,6 +63,13 @@ class GamePad {
     disable_button(button_mask) {
         this.button &= ~button_mask;
     }
+    clone() {
+        return new GamePad(
+            this.button,
+            this.stick_x,
+            this.stick_y,
+        );
+    }
 }
 
 class GameState {
@@ -176,18 +183,18 @@ class Sm64VisualEngine {
         return GamePad.from_pointer(pointer, this);
     }
 
-    get_mario_state() {
-        let pointer = this.game._get_mario_state();
-        const view = new DataView(this.mem_slice(pointer, 0x3C + 12));
+    // get_mario_state() {
+    //     let pointer = this.game._get_mario_state();
+    //     const view = new DataView(this.mem_slice(pointer, 0x3C + 12));
 
-        let i = 0x3C;
+    //     let i = 0x3C;
         
-        let pos = [];
-        pos.push(view.getFloat32(i, littleEndian)); i += 4;
-        pos.push(view.getFloat32(i, littleEndian)); i += 4;
-        pos.push(view.getFloat32(i, littleEndian)); i += 4;
-        return pos;
-    }
+    //     let pos = [];
+    //     pos.push(view.getFloat32(i, littleEndian)); i += 4;
+    //     pos.push(view.getFloat32(i, littleEndian)); i += 4;
+    //     pos.push(view.getFloat32(i, littleEndian)); i += 4;
+    //     return pos;
+    // }
 
     get_controller_pad() {
         let pointer = this.game._get_controller_pad();
@@ -196,23 +203,6 @@ class Sm64VisualEngine {
     get_game_state() {
         let pointer = this.game._get_game_state();
         return new GameState(pointer, this);
-    }
-    get_simple_mario_state() {
-        let pointer = this.game._get_simple_mario_state();
-        const view = new DataView(this.mem_slice(pointer, 24));
-
-        let i = 0;
-
-
-        let pos = [];
-        pos.push(view.getFloat32(i, littleEndian)); i += 4;
-        pos.push(view.getFloat32(i, littleEndian)); i += 4;
-        pos.push(view.getFloat32(i, littleEndian)); i += 4;
-        let vel = [];
-        vel.push(view.getFloat32(i, littleEndian)); i += 4;
-        vel.push(view.getFloat32(i, littleEndian)); i += 4;
-        vel.push(view.getFloat32(i, littleEndian)); i += 4;
-        return [pos, vel];
     }
     set_audio_enabled(truth) {
         return this.game._set_audio_enabled(truth);

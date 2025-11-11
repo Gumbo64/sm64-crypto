@@ -1,9 +1,55 @@
-import { Sm64VisualEngine, GamepadButtons } from "./scripts/sm64/Sm64Game";
+import { Sm64VisualEngine, GamepadButtons, GamePad } from "./scripts/sm64/Sm64Game";
 
 function sleep(time) {
   return new Promise((resolve) => setTimeout(resolve, time));
 }
+async function test(canvas) {
+    let engine = await Sm64VisualEngine.create(canvas, 22);
 
+    let speed = 1;
+    function get_speed() {return speed}
+
+    let i = 0;
+    function step() {
+
+        // true controller pad, other pad can change via RNG
+        let pad = new GamePad(0,0,0);
+        if ( (150 < i && i < 160) || (200 < i && i < 300) ) {
+            pad.button = GamepadButtons.START_BUTTON;
+        }
+        if (i > 300) {
+            pad.stick_y = 80;
+        }
+        if (i % 2 == 0) {
+            pad.button = GamepadButtons.A_BUTTON;
+        }
+        console.log(i)
+        
+        engine.step_game(pad);
+
+
+        let c_pad = engine.get_controller_pad();
+        if (c_pad.is_pressed(GamepadButtons.U_JPAD)) {
+            return true;
+        }
+
+        if (c_pad.is_pressed(GamepadButtons.D_JPAD)) {
+            speed = 10;
+            engine.set_audio_enabled(0);
+        } else {
+            speed = 1;
+            engine.set_audio_enabled(1);
+        }
+        i += 1;
+
+        return false;
+    }
+    
+    await iter_with_anim_frame(step, get_speed);
+
+    return [success, solution_bytes];
+
+}
 async function iter_with_anim_frame(func, get_speed) {
     let done = false;
     let target_time = 0;
@@ -124,7 +170,7 @@ async function record(canvas, seed=NaN, starting_bytes = []) {
 
         // true controller pad, other pad can change via RNG
 
-        let pad = c_pad;
+        let pad = c_pad.clone();
         if (!isNaN(seed)) pad = engine.rng_pad(pad);
         
         engine.step_game(pad);
@@ -168,4 +214,4 @@ async function record_loop(canvas, seed) {
     return (starting_bytes);
 }
 
-export {record_loop};
+export {record_loop, test};

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
-#ifdef TARGET_WEB
+#if defined(TARGET_WEB) && !defined(HEADLESS_VERSION)
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #endif
@@ -115,6 +115,8 @@ static void on_fullscreen_changed(bool is_now_fullscreen) {
     configFullscreen = is_now_fullscreen;
 }
 
+void nothing() {}
+
 #include <stdio.h>
 void main_func() {
 #ifdef USE_SYSTEM_MALLOC
@@ -126,9 +128,11 @@ void main_func() {
 #endif
     gEffectsMemoryPool = mem_pool_init(0x4000, MEMORY_POOL_LEFT);
 
-    configfile_load(CONFIG_FILE);
-    atexit(save_config);
-
+    // configfile_load(CONFIG_FILE);
+    // atexit(save_config);
+#if defined(TARGET_WEB) && !defined(HEADLESS_VERSION)
+    emscripten_set_main_loop(nothing, 0, 0);
+#endif
 #if defined(HEADLESS_VERSION)
     rendering_api = &gfx_dummy_renderer_api;
     wm_api = &gfx_dummy_wm_api;
@@ -217,8 +221,8 @@ void update_seed() {
 
 // #include "controller/controller.h"
 
-
-void step_game(uint16_t button, uint8_t stick_x, uint8_t stick_y) {
+// wasmtime rust only allows 32 and 64 for some reason.
+void step_game(int button, int stick_x, int stick_y) {
     set_tas_controller(button, stick_x, stick_y);
     produce_one_frame();
     update_seed();

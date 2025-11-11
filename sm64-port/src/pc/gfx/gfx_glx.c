@@ -190,11 +190,11 @@ static struct {
     int64_t this_ust;
 } glx;
 
-static int64_t get_time(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (int64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
-}
+// static int64_t get_time(void) {
+//     struct timespec ts;
+//     clock_gettime(CLOCK_MONOTONIC, &ts);
+//     return (int64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+// }
 
 static int64_t adjust_sync_counter(uint32_t counter) {
     uint32_t hi = glx.last_sync_counter >> 32;
@@ -373,7 +373,8 @@ static void gfx_glx_init(const char *game_name, bool start_in_fullscreen, bool s
         glx.has_oml_sync_control = true;
         glx.ust0 = (uint64_t)ust;
     } else {
-        glx.ust0 = get_time();
+        // glx.ust0 = get_time();
+        glx.ust0 = 0;
         if (glx.glXSwapIntervalEXT != NULL) {
             // glx.glXSwapIntervalEXT(glx.dpy, glx.win, 1);
             glx.glXSwapIntervalEXT(glx.dpy, glx.win, 0);

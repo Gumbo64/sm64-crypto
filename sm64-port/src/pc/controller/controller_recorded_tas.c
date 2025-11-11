@@ -8,11 +8,11 @@
 
 #include "controller_api.h"
 
-static int button = 0;
-static int stick_x = 0;
-static int stick_y = 0;
+static uint16_t button = 0;
+static int8_t stick_x = 0;
+static int8_t stick_y = 0;
 
-void set_tas_controller(uint16_t b, uint8_t x, uint8_t y) {
+void set_tas_controller(uint16_t b, int8_t x, int8_t y) {
     button = b;
     stick_x = x;
     stick_y = y;

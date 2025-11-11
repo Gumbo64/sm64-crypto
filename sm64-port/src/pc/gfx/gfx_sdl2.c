@@ -175,8 +175,8 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen, bool s
 
     SDL_GL_SetSwapInterval(1);
     test_vsync();
-    if (!vsync_enabled)
-        puts("Warning: VSync is not enabled or not working. Falling back to timer for synchronization");
+    // if (!vsync_enabled)
+    //     puts("Warning: VSync is not enabled or not working. Falling back to timer for synchronization");
 
     for (size_t i = 0; i < sizeof(windows_scancode_table) / sizeof(SDL_Scancode); i++) {
         inverted_scancode_table[windows_scancode_table[i]] = i;

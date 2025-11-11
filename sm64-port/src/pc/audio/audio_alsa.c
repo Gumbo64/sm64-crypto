@@ -43,11 +43,11 @@
 static snd_pcm_t *pcm_handle;
 static unsigned long int alsa_buffer_size;
 
-static unsigned long get_time(void) {
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return (unsigned long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
-}
+// static unsigned long get_time(void) {
+// 	struct timespec ts;
+// 	clock_gettime(CLOCK_MONOTONIC, &ts);
+// 	return (unsigned long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+// }
 
 static bool audio_alsa_init(void) {
 	int pcm;

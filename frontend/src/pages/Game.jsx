@@ -1,13 +1,13 @@
 import { useEffect } from "react";
 import { useRef, useState } from "react";
-import {record_loop} from "../index.js";
+import {record_loop, test} from "../index.js";
 import './Game.css';
 
 function Game() {
   const canvasRef = useRef(null);
   function startGame() {
-    record_loop(canvasRef.current, 22);
-    // test(canvasRef.current);
+    // record_loop(canvasRef.current, 22);
+    test(canvasRef.current);
 
   }
 

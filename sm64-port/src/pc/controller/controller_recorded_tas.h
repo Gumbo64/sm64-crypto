@@ -6,6 +6,6 @@
 #include <stdio.h>
 
 extern struct ControllerAPI controller_recorded_tas;
-void set_tas_controller(uint16_t b, uint8_t x, uint8_t y);
+void set_tas_controller(uint16_t b, int8_t x, int8_t y);
 
 #endif

@@ -1,5 +1,5 @@
 [workspace]
-members = ["shared", "cli", "browser-wasm"]
+members = ["shared", "cli", "browser-wasm", "wasm-test"]
 
 resolver="3"
 
