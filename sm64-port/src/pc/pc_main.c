@@ -250,7 +250,7 @@ struct GameState {
 };
 
 struct GameState *get_game_state() {
-    static struct GameState info;
+    static struct GameState info = {0};
     info.numStars = gMarioState->numStars;
     info.inCredits = gCurrCreditsEntry != NULL;
     info.courseNum = gCurrCourseNum;

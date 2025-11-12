@@ -100,19 +100,21 @@ def run():
         button = (b[0] << 8) | b[1]
         stickx = int(b[2])
         sticky = int(b[3])
-        # button = 0
-        # stickx = 0
-        # sticky = 0
-        # if ( (150 < i and i < 160) or (200 < i and i < 300) ):
-        #     button = START_BUTTON
+
+
         
-        # if (i > 300):
-        #     stick_y = 80
-        # if ((i % 2) == 0):
-        #     button = A_BUTTON
-        # if (button == START_BUTTON):
-        #     print("Start")
-        
+        print(stickx, sticky)
+        if (True):
+            button = 0
+            stickx = 0
+            sticky = 0
+            if ( (150 < i and i < 160) or (200 < i and i < 300) ):
+                button = START_BUTTON
+            
+            if (i > 300):
+                sticky = 80
+            if ((i % 2) == 0):
+                button = A_BUTTON
 
 
 
