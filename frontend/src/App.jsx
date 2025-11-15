@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Game from "./pages/Game";
 import "./App.css";
 
-import FileUpload from "./components/FileUpload.jsx";
+import { FileUpload } from "sm64-binds-frontend";
 
 function App() {
   const [hasRom, setHasRom] = useState(false);

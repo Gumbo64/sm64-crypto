@@ -1,13 +1,13 @@
 import { useEffect } from "react";
 import { useRef, useState } from "react";
-import {record_loop, test} from "../index.js";
+import { sm64_test, sm64_record} from "sm64-binds-frontend";
 import './Game.css';
 
 function Game() {
   const canvasRef = useRef(null);
   function startGame() {
-    // record_loop(canvasRef.current, 22);
-    test(canvasRef.current);
+    // sm64_record(canvasRef.current, 22);
+    sm64_test(canvasRef.current);
 
   }
 

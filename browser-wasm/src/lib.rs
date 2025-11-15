@@ -1,24 +1,14 @@
 
 use anyhow::{Result, Error};
 
-use n0_future::TryFutureExt;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber_wasm::MakeConsoleWriter;
 use wasm_bindgen::{JsError, prelude::wasm_bindgen};
-use n0_future::{
-    StreamExt,
-    boxed::BoxStream,
-    task::{self, AbortOnDropHandle},
-    time::{Duration, SystemTime},
-};
 
-use std::{
-    sync::{Arc, Mutex}
-};
 use iroh_blobs::Hash;
 
 
-use sm64_crypto_shared::{BlockChainClient};
+use sm64_blockchain::{BlockChainClient};
 
 
 #[wasm_bindgen(start)]
@@ -48,8 +38,8 @@ pub struct BlockChainClientWeb {
 
 #[wasm_bindgen]
 impl BlockChainClientWeb {
-    pub async fn new(miner_name: String, nowait: bool) -> Result<Self, JsError> {
-        let client = BlockChainClient::new(miner_name, nowait)
+    pub async fn new(miner_name: String,  ticket_str: String) -> Result<Self, JsError> {
+        let client = BlockChainClient::new(miner_name, ticket_str)
             .await
             .map_err(to_js_err)?;
         Ok(Self {client})
@@ -63,23 +53,10 @@ impl BlockChainClientWeb {
         self.client.submit_mine(seed, solution).await.map_err(to_js_err)
     }
 
-    pub async fn get_eval_request(&self) -> Result<Vec<u8>, JsError> {
-        let (seed, solution) = self.client.get_eval_request().await.map_err(to_js_err)?;
-
-        let mut result = Vec::new();
-        result.extend(seed.to_le_bytes());
-        result.extend(solution);
-        Ok(result)
-    }
-
-    pub async fn respond_eval_request(&self, seed: u32, valid: bool) -> Result<(), JsError> {
-        self.client.respond_eval_request(seed, valid).await.map_err(to_js_err)
-    }
-
-    pub async fn get_head_bytes(&self) -> Result<Vec<u8>, JsError> {
-        let block = self.client.get_head().await.map_err(to_js_err)?;
-        Ok(block.get_solution())
-    }
+    // pub async fn get_head_bytes(&self) -> Result<Vec<u8>, JsError> {
+    //     let block = self.client.get_head().await.map_err(to_js_err)?;
+    //     Ok(block.get_solution())
+    // }
 
     pub async fn has_new_block(&self) -> bool {
         self.client.has_new_block().await

@@ -7,7 +7,7 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-sm64-crypto-shared = { version = "0.1.0", path = "../shared" }
+sm64-blockchain = { version = "0.1.0", path = "../blockchain" }
 console_error_panic_hook = "0.1.7"
 getrandom = { version = "0.2", features = ["js"] }
 n0-future = "0.1.2"

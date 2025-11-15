@@ -1,7 +1,7 @@
 use std::process::Command;
 use std::env;
 use anyhow::{Error, Result};
-use sm64_crypto_shared::Config;
+use sm64_blockchain::Config;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::thread;

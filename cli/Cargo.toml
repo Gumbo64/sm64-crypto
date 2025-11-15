@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-sm64-crypto-shared = { version = "0.1.0", path = "../shared" }
+sm64-blockchain = { version = "0.1.0", path = "../blockchain" }
 clap = { version = "4.5.47", features = ["derive"] }
 ctrlc = "3.4.7"
 snafu = "0.8.8"
