@@ -1,9 +1,8 @@
 mod blockchain;
 
-use std::str::FromStr;
-
 use blockchain::{Block, BlockChain, Ticket, GamePad};
 use iroh_blobs::Hash;
+use iroh_gossip::TopicId;
 use sm64_binds::SM64GameGenerator;
 use crate::DEFAULT_CONFIG;
 
@@ -23,34 +22,34 @@ pub struct BlockChainClient {
     bc: BlockChain,
     mining_block: Option<Block>,
     miner_name: [u8; DEFAULT_CONFIG.max_name_length],
-    ticket: Ticket,
+    topic_id: TopicId
 }
 
 impl BlockChainClient {
-    pub async fn new(miner_name: String, ticket_str: String) -> Result<Self> {
+    pub async fn new(miner_name: String,  ticket_str: String) -> Result<Self> {
         let game_gen = SM64GameGenerator::from_rom_bytes(include_bytes!("../../baserom.us.z64").to_vec())?;
-        let ticket = match Ticket::from_str(&ticket_str) {
-            Ok(t) => {
-                println!("Ticket SUCCESS");
-                Some(t)
-            },
-            Err(_) => {
-                println!("Ticket FAILED");
-                None
-            },
+
+        let ticket = match Ticket::deserialize(&ticket_str) {
+            Ok(t) => t,
+            Err(_) => Ticket::new_random(),
         };
 
-        let (bc, ticket) = BlockChain::new(game_gen, ticket).await?;
+        let topic_id = ticket.topic_id;
+        let bc = BlockChain::new(game_gen, ticket).await?;
+
         Ok(Self {
             bc,
-            ticket,
+            topic_id,
             mining_block: None,
             miner_name: parse_miner_name(miner_name),
         })
     }
 
     pub fn get_ticket(&self) -> String {
-        self.ticket.to_string()
+        let topic_id = self.topic_id;
+        let bootstrap = [self.bc.endpoint_id()].into_iter().collect();
+        let ticket = Ticket {topic_id, bootstrap};
+        ticket.serialize()
     }
 
     pub async fn start_mine(&mut self) -> Result<u32> {
@@ -60,25 +59,14 @@ impl BlockChainClient {
         Ok(seed)
     }
 
-    pub async fn submit_mine(&mut self, seed: u32, solution: Vec<u8>) -> Result<()> {
+    pub async fn submit_mine(&mut self, seed: u32, solution: Vec<GamePad>) -> Result<()> {
         match self.mining_block {
             Some(mut block) => {
                 if block.calc_seed() != seed {
                     return Err(Error::msg("The provided seed does not match start_mine()"));
                 }
 
-                let mut solution_pads: Vec<GamePad> = Vec::new();
-                for chunk in solution.chunks(4) {
-                    if chunk.len() == 4 {
-                        // Only create GamePad if there's a complete chunk of 4 bytes
-                        let pad = GamePad::from_bytes(chunk);
-                        solution_pads.push(pad);
-                    } else {
-                        eprintln!("Warning: Incomplete chunk ignored: {:?}", chunk);
-                    }
-                }
-
-                block.seal(solution_pads);
+                block.seal(solution);
                 match self.bc.submit_mine(block).await {
                     Ok(_) => {
                         self.mining_block = None;

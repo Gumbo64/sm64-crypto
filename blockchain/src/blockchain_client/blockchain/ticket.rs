@@ -1,45 +1,46 @@
-use iroh::EndpointAddr;
+use std::collections::BTreeSet;
+
+use iroh::EndpointId;
 use iroh_gossip::TopicId;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::str::FromStr;
 use anyhow::Result;
 
-// add the `Ticket` code to the bottom of the main file
-#[derive(Debug, Serialize, Deserialize)]
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Ticket {
-    pub topic: TopicId,
-    pub endpoints: Vec<EndpointAddr>,
+    pub topic_id: TopicId,
+    pub bootstrap: BTreeSet<EndpointId>,
 }
 
 impl Ticket {
-    /// Deserialize from a slice of bytes to a Ticket.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        serde_json::from_slice(bytes).map_err(Into::into)
+    pub fn new_random() -> Self {
+        let topic_id = TopicId::from_bytes(rand::random());
+        Self::new(topic_id)
     }
 
-    /// Serialize from a `Ticket` to a `Vec` of bytes.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(self).expect("serde_json::to_vec is infallible")
+    pub fn new(topic_id: TopicId) -> Self {
+        Self {
+            topic_id,
+            bootstrap: Default::default(),
+        }
     }
-}
-
-// The `Display` trait allows us to use the `to_string`
-// method on `Ticket`.
-impl fmt::Display for Ticket {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut text = data_encoding::BASE32_NOPAD.encode(&self.to_bytes()[..]);
-        text.make_ascii_lowercase();
-        write!(f, "{}", text)
+    pub fn deserialize(input: &str) -> Result<Self> {
+        <Self as iroh_tickets::Ticket>::deserialize(input).map_err(Into::into)
+    }
+    pub fn serialize(&self) -> String {
+        <Self as iroh_tickets::Ticket>::serialize(self)
     }
 }
 
-// The `FromStr` trait allows us to turn a `str` into
-// a `Ticket`
-impl FromStr for Ticket {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = data_encoding::BASE32_NOPAD.decode(s.to_ascii_uppercase().as_bytes())?;
-        Self::from_bytes(&bytes)
+impl iroh_tickets::Ticket for Ticket {
+    const KIND: &'static str = "sm64crypto-";
+
+    fn to_bytes(&self) -> Vec<u8> {
+        postcard::to_stdvec(&self).unwrap()
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Result<Self, iroh_tickets::ParseError> {
+        let ticket = postcard::from_bytes(bytes)?;
+        Ok(ticket)
     }
 }

@@ -79,7 +79,7 @@ async fn main() -> Result<()>{
 
     let bc_client = BlockChainClient::new(args.name, args.ticket).await.expect("Failed to create blockchain client");
 
-    println!("Join us:\n {}\n", bc_client.get_ticket());
+    println!("Join us at:\n{}\n", bc_client.get_ticket());
 
     loop {
         time::sleep(time::Duration::from_secs(1)).await;

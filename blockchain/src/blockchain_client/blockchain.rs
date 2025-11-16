@@ -13,9 +13,9 @@ use serde::{Deserialize, Serialize};
 // use mainline::SigningKey;
 
 use iroh_blobs::{api::{ downloader::{Downloader, Shuffled}, tags::Tags }, BlobsProtocol, Hash };
-use iroh::{Endpoint, PublicKey, SecretKey };
+use iroh::{Endpoint, EndpointId, PublicKey };
 use iroh_gossip::{
-    TopicId, api::{Event, GossipReceiver, GossipSender}, net::Gossip, proto::DeliveryScope::{Neighbors, Swarm}
+    api::{Event, GossipReceiver, GossipSender}, net::Gossip, proto::DeliveryScope::{Neighbors, Swarm}
 };
 
 use iroh::protocol::Router;
@@ -60,14 +60,8 @@ impl Clone for BlockChain {
 }
 
 impl BlockChain {
-    pub async fn new(game_gen: SM64GameGenerator, ticket: Option<Ticket>) -> Result<(Self, Ticket)> {
-        let secret_key = SecretKey::generate(&mut rand::rng());
-        // let signing_key = SigningKey::from_bytes(&secret_key.to_bytes());
-
-        let endpoint = Endpoint::builder()
-            .secret_key(secret_key.clone())
-            .bind()
-            .await?;
+    pub async fn new(game_gen: SM64GameGenerator, ticket: Ticket) -> Result<Self> {
+        let endpoint = Endpoint::builder().bind().await?;
 
         let store = load_store().await;
 
@@ -83,45 +77,38 @@ impl BlockChain {
             .spawn();
 
 
-        // Tickets
-        let (topic, mut endpoints) = match ticket {
-            Some(t) => {
-                let Ticket { topic, endpoints } = t;
-                (topic, endpoints)
-            },
-            None => {
-                let topic = TopicId::from_bytes(rand::random());
-                (topic, vec![])
-            },
-        };
-        let endpoint_ids = endpoints.iter().map(|p| p.id).collect();
-        let (sender, receiver) = gossip
-            .subscribe(topic, endpoint_ids)
-            .await?
-            .split();
-
-
-        // Create our own ticket
-        let ticket = {
-            let me = endpoint.addr();
-            endpoints.push(me);
-            Ticket { topic, endpoints }
-        };
-
         let db_lock = Arc::new(Mutex::new(()));
         let new_block_signal = Arc::new(Mutex::new(false));
         let eval_request = Arc::new(Mutex::new(None));
-
         let random_config = RandomConfig::default();
 
+        let topic_id = ticket.topic_id;
+        let bootstrap = ticket.bootstrap.iter().cloned().collect();
+        let (sender, receiver) = gossip.subscribe(topic_id, bootstrap).await?.split();
+
         let bc = BlockChain {router, downloader, blobs, tags, sender, game_gen, random_config, db_lock, new_block_signal, eval_request};
-        task::spawn(BlockChain::subscribe_loop(bc.clone(), receiver));
-        Ok((bc, ticket))
+        let bc2 = bc.clone();
+        task::spawn(async move {
+            let result = BlockChain::subscribe_loop(bc2, receiver).await;
+
+            match result {
+                Ok(_) => println!("Subscribe loop finished successfully."),
+                Err(e) => println!("Subscribe loop finished with error: {:?}", e),
+            }
+        });
+        Ok(bc)
+    }
+
+    pub fn endpoint_id(&self) -> EndpointId {
+        self.router.endpoint().id()
     }
 
     async fn subscribe_loop(
         bc: BlockChain, mut receiver: GossipReceiver
     ) -> Result<()> {
+        println!("SUBLOOP: Waiting to connect...");
+        receiver.joined().await?;
+        println!("SUBLOOP: Connected!");
         {
             let _guard = bc.db_lock.lock().await;
             bc.request_head().await?;
@@ -140,7 +127,7 @@ impl BlockChain {
                 if let Event::Received(msg) = event {
                     match msg.scope {
                         Neighbors => {} // Only accept direct neighbour messages
-                        Swarm(_) => {continue;}
+                        Swarm(_) => {println!("Bad message scope"); continue;}
                     }
                     let message = BlockMessage::decode(&msg.content)?;
                     match message {
@@ -159,6 +146,9 @@ impl BlockChain {
                         }
                     }
                 }
+                else if let Event::NeighborUp(key) = event {println!("Joined {}", key);}
+                else if let Event::NeighborDown(key) = event {println!("Downed {}", key);}
+                else if let Event::Lagged = event {println!("Lagged");}
                 Ok(())
             };
             match res {
