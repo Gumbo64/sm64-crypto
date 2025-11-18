@@ -1,9 +1,8 @@
 use std::u128;
 use bytes::Bytes;
 use futures_lite::StreamExt;
-#[cfg(not(target_arch = "wasm32"))]
 use iroh_blobs::api::Store;
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(feature = "fs"))]
 use iroh_blobs::store::mem::MemStore;
 use n0_future::task;
 use anyhow::{Error, Result};
@@ -449,15 +448,15 @@ impl BlockMessage {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-async fn load_store() -> Store {
-    MemStore::new();
-}
-
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "fs")]
 async fn load_store() -> Store {
     let store_path = String::from("blockchain_data");
     iroh_blobs::store::fs::FsStore::load(store_path)
         .await
         .expect("failed to load fs").into()
+}
+
+#[cfg(not(feature = "fs"))]
+async fn load_store() -> Store {
+    MemStore::new().into()
 }

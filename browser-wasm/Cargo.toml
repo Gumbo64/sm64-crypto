@@ -7,9 +7,9 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-sm64-blockchain = { version = "0.1.0", path = "../blockchain" }
+sm64-blockchain = { version = "0.1.0", path = "../blockchain", default-features = false, features = ["wasm_js"] }
 console_error_panic_hook = "0.1.7"
-getrandom = { version = "0.2", features = ["js"] }
+getrandom = { version = "0.3", features = [] }
 n0-future = "0.1.2"
 serde = "1.0.217"
 serde-wasm-bindgen = "0.6.5"

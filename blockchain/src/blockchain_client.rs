@@ -27,7 +27,7 @@ pub struct BlockChainClient {
 
 impl BlockChainClient {
     pub async fn new(miner_name: String,  ticket_str: String) -> Result<Self> {
-        let game_gen = SM64GameGenerator::from_rom_bytes(include_bytes!("../../baserom.us.z64").to_vec())?;
+        let game_gen = SM64GameGenerator::new(include_bytes!("../../baserom.us.z64").to_vec())?;
 
         let ticket = match Ticket::deserialize(&ticket_str) {
             Ok(t) => t,

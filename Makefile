@@ -17,13 +17,15 @@ YELLOW = \033[33m
 BLUE   = \033[34m
 
 # Define the default target that will build both web and CLI versions
-all: cli-build
+all: cli-build web-build
 
 
-# CLI Build
+web-build:
+	wasm-pack build ./browser-wasm --dev --weak-refs --reference-types -t bundler -d pkg
+
 cli-build:
 	@echo "$(GREEN)\nBUILDING CLI VERSION$(RESET)"
-	cargo build --release
+	cd cli && cargo build --release
 
 	mkdir -p $(PROD)
 	cp $(RELEASE)/main $(PROD)/main
