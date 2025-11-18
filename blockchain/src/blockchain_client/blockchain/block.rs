@@ -70,6 +70,9 @@ impl Block {
     }
 
     pub fn decode(bytes: &[u8]) -> Result<Block> {
+        if bytes.len() == 0 {
+            return Err(Error::msg("Postcard Block decode failed: Empty binary string!"));
+        }
         Ok(postcard::from_bytes(bytes)?)
     }
 
@@ -91,6 +94,9 @@ impl BlockHead {
     }
 
     pub fn decode(bytes: &[u8]) -> Result<BlockHead> {
+        if bytes.len() == 0 {
+            return Err(Error::msg("Postcard BlockHead decode failed: Empty binary string!"));
+        }
         Ok(postcard::from_bytes(bytes)?)
     }
     

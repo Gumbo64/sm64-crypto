@@ -17,7 +17,7 @@ impl ChainConfig {
 }
 
 const MAX_NAME_LENGTH: usize = 64;
-const MAX_SOLUTION_TIME: usize = 10 * (60 * 30); // 10 minutes
+const MAX_SOLUTION_TIME: usize = 10 * 60 * 30; // 10 minutes
 
 // const MAX_SOLUTION_BYTES: usize = MAX_SOLUTION_TIME * 30 * 4; // seconds * fps * (bytes per frame) 
 

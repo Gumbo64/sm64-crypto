@@ -20,11 +20,12 @@ function Game() {
 
     let rom_bytes = new Uint8Array(await getROM());
     let name = "NUMNUM64";
-    let ticket = "sm64crypto-qvqdwfozjjojmxwnopewqfxp5jdsncii3sa7udovcgwbfp7sq5cqc3h4g73yws5224wgoeisynlkrrci4l4huznonzjopkgi2cpubgyv"
+    let ticket = "";
 
     let bc = await BlockChainClientWeb.new(rom_bytes, name, ticket);
     console.log("---------------------INITIALISED\n\n");
     let seed = await bc.start_mine();
+    console.log("------------------ started mine\n\n");
     let solution = await sm64_record(canvasRef.current, seed, rng_config);
     // let solution = [new GamePad(0,0,0), new GamePad(0,80,80)];
     solution = map_solution_to_wasm(solution);

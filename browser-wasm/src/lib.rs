@@ -15,7 +15,7 @@ fn start() {
     console_error_panic_hook::set_once();
 
     tracing_subscriber::fmt()
-        .with_max_level(LevelFilter::DEBUG)
+        .with_max_level(LevelFilter::INFO)
         .with_writer(
             // To avoide trace events in the browser from showing their JS backtrace
             MakeConsoleWriter::default().map_trace_level_to(tracing::Level::DEBUG),
@@ -56,6 +56,7 @@ impl BlockChainClientWeb {
             true => None,
             false => Some(ticket_str),
         };
+        info!("AAAAAaaa");
 
         let client = BlockChainClient::new(rom_bytes, miner_name, ticket_opt)
             .await

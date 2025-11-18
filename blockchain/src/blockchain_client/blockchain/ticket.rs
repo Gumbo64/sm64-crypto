@@ -33,7 +33,7 @@ impl Ticket {
 }
 
 impl iroh_tickets::Ticket for Ticket {
-    const KIND: &'static str = "sm64crypto-";
+    const KIND: &'static str = "sm64";
 
     fn to_bytes(&self) -> Vec<u8> {
         postcard::to_stdvec(&self).unwrap()

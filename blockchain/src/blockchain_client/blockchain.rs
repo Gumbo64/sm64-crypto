@@ -40,7 +40,7 @@ pub use ticket::Ticket;
 #[derive(Debug)]
 pub struct BlockChain {
     router: Router, downloader: Downloader, blobs: BlobsProtocol, tags: Tags, sender: GossipSender, game_gen: SM64GameGenerator, random_config: RandomConfig,
-    db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>, eval_request: Arc<Mutex<Option<(Block, Option<bool>)>>>,
+    db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>,
 }
 impl Clone for BlockChain {
     fn clone(&self) -> Self {
@@ -54,7 +54,6 @@ impl Clone for BlockChain {
             random_config: self.random_config.clone(),
             db_lock: Arc::clone(&self.db_lock), // We need to make sure it uses this function not just .clone()
             new_block_signal: Arc::clone(&self.new_block_signal),
-            eval_request: Arc::clone(&self.eval_request),
         }
     }
 }
@@ -80,14 +79,13 @@ impl BlockChain {
 
         let db_lock = Arc::new(Mutex::new(()));
         let new_block_signal = Arc::new(Mutex::new(false));
-        let eval_request = Arc::new(Mutex::new(None));
         let random_config = RandomConfig::default();
 
         let topic_id = ticket.topic_id;
         let bootstrap = ticket.bootstrap.iter().cloned().collect();
         let (sender, receiver) = gossip.subscribe(topic_id, bootstrap).await?.split();
 
-        let bc = BlockChain {router, downloader, blobs, tags, sender, game_gen, random_config, db_lock, new_block_signal, eval_request};
+        let bc = BlockChain {router, downloader, blobs, tags, sender, game_gen, random_config, db_lock, new_block_signal};
         let bc2 = bc.clone();
         task::spawn(async move {
             let result = BlockChain::subscribe_loop(bc2, receiver).await;
@@ -97,7 +95,6 @@ impl BlockChain {
                 Err(e) => info!("Subscribe loop finished with error: {:?}", e),
             }
         });
-        info!("CCCCC");
 
         Ok(bc)
     }
@@ -128,20 +125,21 @@ impl BlockChain {
             let _guard = bc.db_lock.lock().await;
             let res: Result<()> = {
                 if let Event::Received(msg) = event {
+                    info!("received");
                     match msg.scope {
                         Neighbors => {} // Only accept direct neighbour messages
-                        Swarm(_) => {info!("Bad message scope"); continue;}
+                        Swarm(_) => {return Err(Error::msg("Bad message scope"));}
                     }
                     let message = BlockMessage::decode(&msg.content)?;
                     match message {
                         BlockMessage::NewBlockHead { hash } => {
                             let peer_vec: Vec<PublicKey> = receiver.neighbors().into_iter().collect();   
-                            match bc.new_block(hash, peer_vec.clone()).await {
+                            match bc.new_block(hash, peer_vec).await {
                                 Ok(_) => {
                                     bc.broadcast_head().await?;
                                     bc.print_state().await?;
                                 },
-                                Err(_) => {info!("New block failed")}
+                                Err(_) => {return Err(Error::msg("New block failed"))}
                             }
                         },
                         BlockMessage::RequestBlockHead {} => {
@@ -161,6 +159,7 @@ impl BlockChain {
         }
         Ok(())
     }
+
     async fn print_state(&self) -> Result<()> {
         let head = self.get_head().await?;
         if !head.no_blocks() {
@@ -444,6 +443,9 @@ enum BlockMessage {
 
 impl BlockMessage {
     pub fn decode(bytes: &[u8]) -> Result<BlockMessage> {
+        if bytes.len() == 0 {
+            return Err(Error::msg("Postcard BlockMessage decode failed: Empty binary string!"));
+        }
         Ok(postcard::from_bytes(bytes)?)
     }
 
