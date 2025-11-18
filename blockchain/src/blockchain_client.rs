@@ -5,6 +5,7 @@ use iroh_blobs::Hash;
 use iroh_gossip::TopicId;
 use sm64_binds::SM64GameGenerator;
 use crate::DEFAULT_CONFIG;
+use tracing::info;
 
 use anyhow::{Result, Error};
 
@@ -26,16 +27,24 @@ pub struct BlockChainClient {
 }
 
 impl BlockChainClient {
-    pub async fn new(miner_name: String,  ticket_str: String) -> Result<Self> {
-        let game_gen = SM64GameGenerator::new(include_bytes!("../../baserom.us.z64").to_vec())?;
+    pub async fn new(rom_bytes: Vec<u8>, miner_name: String, ticket_opt: Option<String>) -> Result<Self> {
+        info!("BBBBBB");
 
-        let ticket = match Ticket::deserialize(&ticket_str) {
-            Ok(t) => t,
-            Err(_) => Ticket::new_random(),
+        let game_gen = SM64GameGenerator::new(rom_bytes)?;
+
+        let ticket = match ticket_opt {
+            Some(ticket_str) => {
+                Ticket::deserialize(&ticket_str)?
+            },
+            None => {
+                Ticket::new_random()
+            }
         };
 
         let topic_id = ticket.topic_id;
+        info!("almost bbbb");
         let bc = BlockChain::new(game_gen, ticket).await?;
+        info!("BBBBBB");
 
         Ok(Self {
             bc,
@@ -66,7 +75,7 @@ impl BlockChainClient {
                     return Err(Error::msg("The provided seed does not match start_mine()"));
                 }
 
-                block.seal(solution);
+                block.seal(solution)?;
                 match self.bc.submit_mine(block).await {
                     Ok(_) => {
                         self.mining_block = None;
@@ -97,7 +106,7 @@ impl BlockChainClient {
         let l1 = hash_bytes.len();
         let l2 = Hash::EMPTY.as_bytes().len();
         if l1 != l2 {
-            println!("hash lengths: {} {}\n", l1, l2);
+            info!("hash lengths: {} {}\n", l1, l2);
             return Err(Error::msg("Provided hash is of the wrong length, might be whitespace"));
         }
         let mut array: [u8; 32] = [0u8; 32];

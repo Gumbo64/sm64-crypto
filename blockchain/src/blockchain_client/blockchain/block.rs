@@ -1,6 +1,6 @@
 use std::u128;
 use bytes::Bytes;
-use anyhow::Result;
+use anyhow::{Result, Error};
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
 use iroh_blobs::Hash;
@@ -30,11 +30,14 @@ impl Block {
         let tmp_solution_bytes: [GamePad; DEFAULT_CONFIG.max_solution_time] = [GamePad::default(); DEFAULT_CONFIG.max_solution_time];
         Block {prev_hash, block_height, timestamp, miner_name, solution_bytes:tmp_solution_bytes}
     }
-    pub fn seal(&mut self, solution_vec: Vec<GamePad>) {
-        assert!(solution_vec.len() <= DEFAULT_CONFIG.max_solution_time);
+    pub fn seal(&mut self, solution_vec: Vec<GamePad>) -> Result<()> {
+        if solution_vec.len() > DEFAULT_CONFIG.max_solution_time {
+            return Err(Error::msg("Solution is too long"));
+        }
 
-        let copy_length = solution_vec.len().min(DEFAULT_CONFIG.max_solution_time);
+        let copy_length = solution_vec.len();
         self.solution_bytes[..copy_length].copy_from_slice(&solution_vec[..copy_length]);
+        Ok(())
     }
 
     pub fn calc_seed(&self) -> u32 {

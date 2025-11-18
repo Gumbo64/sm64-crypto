@@ -1,7 +1,7 @@
 
 use anyhow::{Result, Error};
 
-use tracing::level_filters::LevelFilter;
+use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber_wasm::MakeConsoleWriter;
 use wasm_bindgen::{JsError, prelude::wasm_bindgen};
 
@@ -25,7 +25,7 @@ fn start() {
         .with_ansi(false)
         .init();
 
-    tracing::info!("(testing logging) Logging setup");
+    // tracing::info!("(testing logging) Logging setup");
 }
 
 #[wasm_bindgen]
@@ -33,6 +33,13 @@ pub struct GamePadWeb {
     button: u16,
     stick_x: i8,
     stick_y: i8,
+}
+
+#[wasm_bindgen]
+impl GamePadWeb {
+    pub fn new(button: u16, stick_x: i8, stick_y: i8,) -> Result<Self, JsError> {
+        Ok(Self { button, stick_x, stick_y})
+    }
 }
 
 /// Blockchain node using Iroh
@@ -43,10 +50,18 @@ pub struct BlockChainClientWeb {
 
 #[wasm_bindgen]
 impl BlockChainClientWeb {
-    pub async fn new(miner_name: String, ticket_str: String) -> Result<Self, JsError> {
-        let client = BlockChainClient::new(miner_name, ticket_str)
+    pub async fn new(rom_bytes: Vec<u8>, miner_name: String, ticket_str: String) -> Result<Self, JsError> {
+        info!("AAAAA");
+        let ticket_opt = match ticket_str.len() == 0 {
+            true => None,
+            false => Some(ticket_str),
+        };
+
+        let client = BlockChainClient::new(rom_bytes, miner_name, ticket_opt)
             .await
             .map_err(to_js_err)?;
+        info!("AAAAA");
+
         Ok(Self {client})
     }
 
@@ -66,7 +81,7 @@ impl BlockChainClientWeb {
         //         let pad = GamePad::from_bytes(chunk);
         //         solution_pads.push(pad);
         //     } else {
-        //         eprintln!("Warning: Incomplete chunk ignored: {:?}", chunk);
+        //         einfo!("Warning: Incomplete chunk ignored: {:?}", chunk);
         //     }
         // }
 
@@ -97,7 +112,7 @@ impl BlockChainClientWeb {
         let l1 = hash_bytes.len();
         let l2 = Hash::EMPTY.as_bytes().len();
         if l1 != l2 {
-            println!("hash lengths: {} {}\n", l1, l2);
+            info!("hash lengths: {} {}\n", l1, l2);
             return Err(Error::msg("Provided hash is of the wrong length, might be whitespace")).map_err(to_js_err);
         }
         let mut array: [u8; 32] = [0u8; 32];

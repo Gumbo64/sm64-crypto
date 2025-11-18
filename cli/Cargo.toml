@@ -18,4 +18,5 @@ n0-future = { workspace = true }
 
 tokio = "1.47.1"
 anyhow = "1.0.100"
+tracing = "0.1.41"
 

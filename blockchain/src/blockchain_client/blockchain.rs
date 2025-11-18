@@ -18,6 +18,7 @@ use iroh_gossip::{
 };
 
 use iroh::protocol::Router;
+use tracing::info;
 // use iroh_docs::{protocol::Docs};
 // use std::sync::{Arc, Mutex};
 use std::sync::Arc;
@@ -60,6 +61,7 @@ impl Clone for BlockChain {
 
 impl BlockChain {
     pub async fn new(game_gen: SM64GameGenerator, ticket: Ticket) -> Result<Self> {
+        info!("CCCCC");
         let endpoint = Endpoint::builder().bind().await?;
 
         let store = load_store().await;
@@ -91,10 +93,12 @@ impl BlockChain {
             let result = BlockChain::subscribe_loop(bc2, receiver).await;
 
             match result {
-                Ok(_) => println!("Subscribe loop finished successfully."),
-                Err(e) => println!("Subscribe loop finished with error: {:?}", e),
+                Ok(_) => info!("Subscribe loop finished successfully."),
+                Err(e) => info!("Subscribe loop finished with error: {:?}", e),
             }
         });
+        info!("CCCCC");
+
         Ok(bc)
     }
 
@@ -105,9 +109,9 @@ impl BlockChain {
     async fn subscribe_loop(
         bc: BlockChain, mut receiver: GossipReceiver
     ) -> Result<()> {
-        println!("SUBLOOP: Waiting to connect...");
+        info!("SUBLOOP: Waiting to connect...");
         receiver.joined().await?;
-        println!("SUBLOOP: Connected!");
+        info!("SUBLOOP: Connected!");
         {
             let _guard = bc.db_lock.lock().await;
             bc.request_head().await?;
@@ -117,7 +121,7 @@ impl BlockChain {
         bc.print_state().await?;
         while let Some(e) = receiver.next().await {
             if e.is_err() {
-                println!("error receiver");
+                info!("error receiver");
                 continue;
             }
             let event = e?;
@@ -126,7 +130,7 @@ impl BlockChain {
                 if let Event::Received(msg) = event {
                     match msg.scope {
                         Neighbors => {} // Only accept direct neighbour messages
-                        Swarm(_) => {println!("Bad message scope"); continue;}
+                        Swarm(_) => {info!("Bad message scope"); continue;}
                     }
                     let message = BlockMessage::decode(&msg.content)?;
                     match message {
@@ -137,7 +141,7 @@ impl BlockChain {
                                     bc.broadcast_head().await?;
                                     bc.print_state().await?;
                                 },
-                                Err(_) => {println!("New block failed")}
+                                Err(_) => {info!("New block failed")}
                             }
                         },
                         BlockMessage::RequestBlockHead {} => {
@@ -145,14 +149,14 @@ impl BlockChain {
                         }
                     }
                 }
-                else if let Event::NeighborUp(key) = event {println!("Joined {}", key);}
-                else if let Event::NeighborDown(key) = event {println!("Downed {}", key);}
-                else if let Event::Lagged = event {println!("Lagged");}
+                else if let Event::NeighborUp(key) = event {info!("Joined {}", key);}
+                else if let Event::NeighborDown(key) = event {info!("Downed {}", key);}
+                else if let Event::Lagged = event {info!("Lagged");}
                 Ok(())
             };
             match res {
                 Ok(_) => continue,
-                Err(s) => println!("\n\n\nMISC SUBSCRIBER ERROR {:?}\n\n", s)
+                Err(s) => info!("\n\n\nMISC SUBSCRIBER ERROR {:?}\n\n", s)
             }
         }
         Ok(())
@@ -181,9 +185,9 @@ impl BlockChain {
             
 
             let converted_timestamp: DateTime<Local> = DateTime::from(head_block.timestamp);
-            println!("Current height: {}\nCurrent hash: {:?}\nAt time: {:?}\nMined by: {:?}", head.height, head.hash, converted_timestamp, name);
+            info!("Current height: {}\nCurrent hash: {:?}\nAt time: {:?}\nMined by: {:?}", head.height, head.hash, converted_timestamp, name);
         } else {
-            println!("\n\nNEW CHAIN\n\n");
+            info!("\n\nNEW CHAIN\n\n");
         }
         Ok(())
     }
@@ -405,7 +409,7 @@ impl BlockChain {
                 self.broadcast_block(new_hash).await?;
                 self.print_state().await?;
             },
-            Err(_) => {println!("New block failed")}
+            Err(_) => {info!("New block failed")}
         }
         Ok(())
     }
