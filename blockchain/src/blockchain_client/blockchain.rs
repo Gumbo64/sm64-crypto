@@ -1,6 +1,7 @@
 use std::u128;
 use bytes::Bytes;
 use futures_lite::StreamExt;
+use hex::ToHex;
 use iroh_blobs::api::Store;
 #[cfg(not(feature = "fs"))]
 use iroh_blobs::store::mem::MemStore;
@@ -12,7 +13,7 @@ use serde::{Deserialize, Serialize};
 // use mainline::SigningKey;
 
 use iroh_blobs::{api::{ downloader::{Downloader, Shuffled}, tags::Tags }, BlobsProtocol, Hash };
-use iroh::{Endpoint, EndpointId, PublicKey };
+use iroh::{Endpoint, EndpointId };
 use iroh_gossip::{
     api::{Event, GossipReceiver, GossipSender}, net::Gossip, proto::DeliveryScope::{Neighbors, Swarm}
 };
@@ -60,7 +61,6 @@ impl Clone for BlockChain {
 
 impl BlockChain {
     pub async fn new(game_gen: SM64GameGenerator, ticket: Ticket) -> Result<Self> {
-        info!("CCCCC");
         let endpoint = Endpoint::builder().bind().await?;
 
         let store = load_store().await;
@@ -106,6 +106,7 @@ impl BlockChain {
     async fn subscribe_loop(
         bc: BlockChain, mut receiver: GossipReceiver
     ) -> Result<()> {
+        return Ok(());
         info!("SUBLOOP: Waiting to connect...");
         receiver.joined().await?;
         info!("SUBLOOP: Connected!");
@@ -130,11 +131,17 @@ impl BlockChain {
                         Neighbors => {} // Only accept direct neighbour messages
                         Swarm(_) => {return Err(Error::msg("Bad message scope"));}
                     }
+                    info!("received2");
+
                     let message = BlockMessage::decode(&msg.content)?;
+                    info!("received3");
+
                     match message {
                         BlockMessage::NewBlockHead { hash } => {
-                            let peer_vec: Vec<PublicKey> = receiver.neighbors().into_iter().collect();   
-                            match bc.new_block(hash, peer_vec).await {
+                            info!("newblockhead");
+
+                            let peers: Vec<EndpointId> = receiver.neighbors().into_iter().collect();   
+                            match bc.new_block(hash, peers).await {
                                 Ok(_) => {
                                     bc.broadcast_head().await?;
                                     bc.print_state().await?;
@@ -143,6 +150,8 @@ impl BlockChain {
                             }
                         },
                         BlockMessage::RequestBlockHead {} => {
+                            info!("reqblockhead");
+
                             bc.broadcast_head().await?;
                         }
                     }
@@ -164,27 +173,8 @@ impl BlockChain {
         let head = self.get_head().await?;
         if !head.no_blocks() {
             let head_block = self.get_local_block(head.hash).await?;
-
-            let name = match String::from_utf8(head_block.miner_name.to_vec()) {
-                Ok(string) => {
-                    let trim_str = string.trim_end_matches('\0').to_string();
-                    match trim_str.is_ascii() {
-                        true => {
-                            trim_str
-                        }
-                        false => {
-                            String::from("Unknown")
-                        }
-                    }
-                }
-                Err(_e) => {
-                    String::from("Unknown")
-                }
-            };
-            
-
             let converted_timestamp: DateTime<Local> = DateTime::from(head_block.timestamp);
-            info!("Current height: {}\nCurrent hash: {:?}\nAt time: {:?}\nMined by: {:?}", head.height, head.hash, converted_timestamp, name);
+            info!("Current height: {}\nCurrent hash: {:?}\nAt time: {:?}\nMined by: {:?}", head.height, head.hash, converted_timestamp, head_block.miner_name.clone());
         } else {
             info!("\n\nNEW CHAIN\n\n");
         }
@@ -192,27 +182,17 @@ impl BlockChain {
     }
 
     async fn get_head(&self) -> Result<BlockHead> {
-        let ott = self.tags.get(String::from("head")).await;
-
-        match ott {
-            Ok(ot) => {
-                match ot {
-                    Some(t) => {
-                        let bytes = self.blobs.get_bytes(t.hash).await?;
-                        return Ok(BlockHead::decode(&bytes)?);
-                    },
-                    None => {
-                        self.set_head(BlockHead::default()).await?;
-                        return Ok(BlockHead::default());
-                    }
-                }
+        let ot = self.tags.get(String::from("head")).await?;
+        match ot {
+            Some(t) => {
+                let bytes = self.blobs.get_bytes(t.hash).await?;
+                return Ok(BlockHead::decode(&bytes)?);
             },
-            Err(_e) => {
+            None => {
                 self.set_head(BlockHead::default()).await?;
                 return Ok(BlockHead::default());
             }
         }
-
     }
     async fn set_head(&self, head: BlockHead) -> Result<()> {
         let h = self.blobs.add_bytes(head.encode()?).await?.hash;
@@ -221,7 +201,7 @@ impl BlockChain {
     }
 
     // Block that might be foreign
-    async fn get_foreign_block(&self, hash: Hash, peers: Vec<PublicKey>) -> Result<Block> {
+    async fn get_foreign_block(&self, hash: Hash, peers: Vec<EndpointId>) -> Result<Block> {
         match self.get_local_block(hash).await {
             Ok(b) => Ok(b), // We have it locally
             Err(_e) => { // Try to get it from peers
@@ -231,12 +211,7 @@ impl BlockChain {
                     .stream().await?;
 
                 while let Some(_event) = progress.next().await {}
-                match self.get_local_block(hash).await {
-                    Ok(b) => Ok(b),
-                    Err(e) => {
-                        return Err(e);
-                    } 
-                }
+                self.get_local_block(hash).await
             }
         }
     }
@@ -272,7 +247,7 @@ impl BlockChain {
         Ok(())
     }
 
-    async fn new_block(&self, new_head_hash: Hash, peers: Vec<PublicKey>) -> Result<()> {
+    async fn new_block(&self, new_head_hash: Hash, peers: Vec<EndpointId>) -> Result<()> {
         let new_head = self.get_foreign_block(new_head_hash, peers.clone()).await?;
 
         // check that the new block is even worth it, it should be higher than our head
@@ -303,7 +278,7 @@ impl BlockChain {
             }
 
             // Check replay
-            if !self.evaluate_replay(block).await? {
+            if !self.evaluate_replay(&block).await? {
                 return Err(Error::msg("Replay fail"));
             }
 
@@ -333,7 +308,7 @@ impl BlockChain {
         Ok(())
     }
 
-    async fn evaluate_replay(&self, block: Block) -> Result<bool> {
+    async fn evaluate_replay(&self, block: &Block) -> Result<bool> {
         let mut game = self.game_gen.create_game()?;
         game.rng_init(block.calc_seed(), self.random_config)?;
 
@@ -383,7 +358,7 @@ impl BlockChain {
         }
     }
 
-    pub async fn start_mine(&self, miner_name: [u8; DEFAULT_CONFIG.max_name_length]) -> Result<Block> {
+    pub async fn start_mine(&self, miner_name: String) -> Result<Block> {
         let mut _guard = self.db_lock.lock().await;
         {
             // If any new blocks are made while we're playing, then it will kill the recording session
@@ -403,7 +378,10 @@ impl BlockChain {
         let new_hash = self.add_block_blob(new_block).await?;
 
         // You never have to download anything since you mined it locally, therefore no peers are needed
-        match self.new_block(new_hash, vec![]).await {
+
+        let peers: Vec<EndpointId> = Vec::new();
+
+        match self.new_block(new_hash, peers).await {
             Ok(_) => {
                 self.broadcast_block(new_hash).await?;
                 self.print_state().await?;
@@ -423,14 +401,14 @@ impl BlockChain {
         false
     }
     // these two have _public because we shouldn't use them in this file. because we don't want to acquire locks
-    pub async fn get_head_block_public(&self) -> Result<Block> {
+    pub async fn get_head_hash_public(&self) -> Result<String> {
         let _guard = self.db_lock.lock().await;
         let head = self.get_head().await?;
-        self.get_local_block(head.hash).await
+        Ok(head.hash.encode_hex())
     }
 
     pub async fn get_local_block_public(&self, hash: Hash) -> Result<Block> {
-        let mut _guard = self.db_lock.lock().await;
+        let _guard = self.db_lock.lock().await;
         self.get_local_block(hash).await
     }
 }
@@ -443,9 +421,6 @@ enum BlockMessage {
 
 impl BlockMessage {
     pub fn decode(bytes: &[u8]) -> Result<BlockMessage> {
-        if bytes.len() == 0 {
-            return Err(Error::msg("Postcard BlockMessage decode failed: Empty binary string!"));
-        }
         Ok(postcard::from_bytes(bytes)?)
     }
 

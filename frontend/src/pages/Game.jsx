@@ -14,26 +14,32 @@ function map_solution_to_wasm(solution)  {
 function Game() {
   const canvasRef = useRef(null);
   async function startGame() {
-
     let rng_config = make_config(64, 10*(60*30), 100, 5, 0.5, 0.5, 0.2);
-
-
     let rom_bytes = new Uint8Array(await getROM());
     let name = "NUMNUM64";
-    let ticket = "";
-
+    let ticket = "sm6452mtjb5eouy4cnizzqrupzljbelpdtgweaamfrgkiuw3xk24wvaad4ishdy35um7xd5ic6aw2m7wpogbhy4fa6xqvovmi7f5ta7voapq";
     let bc = await BlockChainClientWeb.new(rom_bytes, name, ticket);
     console.log("---------------------INITIALISED\n\n");
-    let seed = await bc.start_mine();
-    console.log("------------------ started mine\n\n");
-    let solution = await sm64_record(canvasRef.current, seed, rng_config);
-    // let solution = [new GamePad(0,0,0), new GamePad(0,80,80)];
-    solution = map_solution_to_wasm(solution);
 
-    await bc.submit_mine(seed, solution);
+    while (true) {
+      let seed = await bc.start_mine();
+      console.log("------------------ started mine\n\n");
+
+      console.log(seed, rng_config);
+      let solution = await sm64_record(canvasRef.current, seed, rng_config);
+      // // let solution = [new GamePad(0,0,0), new GamePad(0,80,80)];
+      solution = map_solution_to_wasm(solution);
+
+      await bc.submit_mine(seed, solution);
+
+      let hash = await bc.get_head_hash();
+      console.log(hash);
+      // let block = await bc.get_block_json(hash);
+      // console.log(block)
+    }
+
 
     // sm64_test(canvasRef.current);
-
 
   }
 

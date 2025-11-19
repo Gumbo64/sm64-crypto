@@ -9,34 +9,29 @@ use chrono::{DateTime, Utc};
 use crate::DEFAULT_CONFIG;
 use sm64_binds::GamePad;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Block {
     pub(crate) prev_hash: Hash,
     pub(crate) block_height: u128,
     pub(crate) timestamp: DateTime<Utc>,
 
-    #[serde(with = "serde_arrays")]
-    pub(crate) miner_name: [u8; DEFAULT_CONFIG.max_name_length],
-    #[serde(with = "serde_arrays")]
-    solution_bytes: [GamePad; DEFAULT_CONFIG.max_solution_time],
+    pub(crate) miner_name: String,
+    solution: Vec<GamePad>,
 }
 
 impl Block {
-    pub fn new(block_head: BlockHead, miner_name: [u8; DEFAULT_CONFIG.max_name_length]) -> Self {
+    pub fn new(block_head: BlockHead, miner_name: String) -> Self {
         let prev_hash = block_head.hash;
         let block_height = block_head.height.wrapping_add(1);
         
         let timestamp = Utc::now();
-        let tmp_solution_bytes: [GamePad; DEFAULT_CONFIG.max_solution_time] = [GamePad::default(); DEFAULT_CONFIG.max_solution_time];
-        Block {prev_hash, block_height, timestamp, miner_name, solution_bytes:tmp_solution_bytes}
+        Block {prev_hash, block_height, timestamp, miner_name, solution:Vec::new()}
     }
     pub fn seal(&mut self, solution_vec: Vec<GamePad>) -> Result<()> {
         if solution_vec.len() > DEFAULT_CONFIG.max_solution_time {
             return Err(Error::msg("Solution is too long"));
         }
-
-        let copy_length = solution_vec.len();
-        self.solution_bytes[..copy_length].copy_from_slice(&solution_vec[..copy_length]);
+        self.solution = solution_vec;
         Ok(())
     }
 
@@ -62,7 +57,7 @@ impl Block {
         u32::from_be_bytes(hash_bytes.try_into().expect("slice with incorrect length"))
     }
     pub fn get_solution(&self) -> Vec<GamePad> {
-        self.solution_bytes.to_vec().clone()
+        self.solution.clone()
     }
 
     pub fn encode(&self) -> Result<Bytes> {
@@ -70,9 +65,6 @@ impl Block {
     }
 
     pub fn decode(bytes: &[u8]) -> Result<Block> {
-        if bytes.len() == 0 {
-            return Err(Error::msg("Postcard Block decode failed: Empty binary string!"));
-        }
         Ok(postcard::from_bytes(bytes)?)
     }
 
@@ -94,9 +86,6 @@ impl BlockHead {
     }
 
     pub fn decode(bytes: &[u8]) -> Result<BlockHead> {
-        if bytes.len() == 0 {
-            return Err(Error::msg("Postcard BlockHead decode failed: Empty binary string!"));
-        }
         Ok(postcard::from_bytes(bytes)?)
     }
     

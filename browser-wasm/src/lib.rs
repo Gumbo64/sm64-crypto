@@ -51,17 +51,14 @@ pub struct BlockChainClientWeb {
 #[wasm_bindgen]
 impl BlockChainClientWeb {
     pub async fn new(rom_bytes: Vec<u8>, miner_name: String, ticket_str: String) -> Result<Self, JsError> {
-        info!("AAAAA");
         let ticket_opt = match ticket_str.len() == 0 {
             true => None,
             false => Some(ticket_str),
         };
-        info!("AAAAAaaa");
 
         let client = BlockChainClient::new(rom_bytes, miner_name, ticket_opt)
             .await
             .map_err(to_js_err)?;
-        info!("AAAAA");
 
         Ok(Self {client})
     }
@@ -103,24 +100,14 @@ impl BlockChainClientWeb {
         self.client.has_new_block().await
     }
 
-    pub async fn get_block_head_json(&self) -> Result<String, JsError> {
-        let block = self.client.get_head().await.map_err(to_js_err)?;
-        Ok(serde_json::to_string_pretty(&block)?)
+    pub async fn get_head_hash(&self) -> Result<String, JsError> {
+        let head = self.client.get_head_hash().await.map_err(to_js_err)?;
+        Ok(head)
     }
 
-    pub async fn get_block_json(&self, hash: String) -> Result<String, JsError> {
-        let hash_bytes = hash.as_bytes();
-        let l1 = hash_bytes.len();
-        let l2 = Hash::EMPTY.as_bytes().len();
-        if l1 != l2 {
-            info!("hash lengths: {} {}\n", l1, l2);
-            return Err(Error::msg("Provided hash is of the wrong length, might be whitespace")).map_err(to_js_err);
-        }
-        let mut array: [u8; 32] = [0u8; 32];
-        array[..hash_bytes.len()].copy_from_slice(hash_bytes);
-
-        let block = self.client.get_block(Hash::from_bytes(array)).await.map_err(to_js_err)?;
-        Ok(serde_json::to_string_pretty(&block)?)
+    pub async fn get_block_json(&self, hash_str: String) -> Result<String, JsError> {
+        let block = self.client.get_block_from_str(hash_str).await.map_err(to_js_err)?;
+        Ok(serde_json::to_string_pretty(&block).map_err(to_js_err)?)
     } 
 }
 
