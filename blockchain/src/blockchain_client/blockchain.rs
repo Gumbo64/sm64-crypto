@@ -1,13 +1,13 @@
 use std::u128;
 use bytes::Bytes;
 use futures_lite::StreamExt;
-use hex::ToHex;
 use iroh_blobs::api::Store;
 #[cfg(not(feature = "fs"))]
 use iroh_blobs::store::mem::MemStore;
 use n0_future::task;
 use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc, Local};
 
 // use distributed_topic_tracker::{AutoDiscoveryGossip, RecordPublisher, TopicId, GossipReceiver, GossipSender};
 // use mainline::SigningKey;
@@ -15,7 +15,8 @@ use serde::{Deserialize, Serialize};
 use iroh_blobs::{api::{ downloader::{Downloader, Shuffled}, tags::Tags }, BlobsProtocol, Hash };
 use iroh::{Endpoint, EndpointId };
 use iroh_gossip::{
-    api::{Event, GossipReceiver, GossipSender}, net::Gossip, proto::DeliveryScope::{Neighbors, Swarm}
+    api::{Event, GossipReceiver, GossipSender}, net::Gossip,
+    // proto::DeliveryScope::{Neighbors, Swarm}
 };
 
 use iroh::protocol::Router;
@@ -24,9 +25,6 @@ use tracing::info;
 // use std::sync::{Arc, Mutex};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use chrono::{DateTime, Local};
-
-use crate::DEFAULT_CONFIG;
 
 pub use sm64_binds::{GamePad, RandomConfig, SM64GameGenerator};
 
@@ -87,14 +85,8 @@ impl BlockChain {
 
         let bc = BlockChain {router, downloader, blobs, tags, sender, game_gen, random_config, db_lock, new_block_signal};
         let bc2 = bc.clone();
-        task::spawn(async move {
-            let result = BlockChain::subscribe_loop(bc2, receiver).await;
 
-            match result {
-                Ok(_) => info!("Subscribe loop finished successfully."),
-                Err(e) => info!("Subscribe loop finished with error: {:?}", e),
-            }
-        });
+        task::spawn(subscribe_loop(bc2, receiver));
 
         Ok(bc)
     }
@@ -103,78 +95,12 @@ impl BlockChain {
         self.router.endpoint().id()
     }
 
-    async fn subscribe_loop(
-        bc: BlockChain, mut receiver: GossipReceiver
-    ) -> Result<()> {
-        return Ok(());
-        info!("SUBLOOP: Waiting to connect...");
-        receiver.joined().await?;
-        info!("SUBLOOP: Connected!");
-        {
-            let _guard = bc.db_lock.lock().await;
-            bc.request_head().await?;
-            bc.broadcast_head().await?;
-        }
-
-        bc.print_state().await?;
-        while let Some(e) = receiver.next().await {
-            if e.is_err() {
-                info!("error receiver");
-                continue;
-            }
-            let event = e?;
-            let _guard = bc.db_lock.lock().await;
-            let res: Result<()> = {
-                if let Event::Received(msg) = event {
-                    info!("received");
-                    match msg.scope {
-                        Neighbors => {} // Only accept direct neighbour messages
-                        Swarm(_) => {return Err(Error::msg("Bad message scope"));}
-                    }
-                    info!("received2");
-
-                    let message = BlockMessage::decode(&msg.content)?;
-                    info!("received3");
-
-                    match message {
-                        BlockMessage::NewBlockHead { hash } => {
-                            info!("newblockhead");
-
-                            let peers: Vec<EndpointId> = receiver.neighbors().into_iter().collect();   
-                            match bc.new_block(hash, peers).await {
-                                Ok(_) => {
-                                    bc.broadcast_head().await?;
-                                    bc.print_state().await?;
-                                },
-                                Err(_) => {return Err(Error::msg("New block failed"))}
-                            }
-                        },
-                        BlockMessage::RequestBlockHead {} => {
-                            info!("reqblockhead");
-
-                            bc.broadcast_head().await?;
-                        }
-                    }
-                }
-                else if let Event::NeighborUp(key) = event {info!("Joined {}", key);}
-                else if let Event::NeighborDown(key) = event {info!("Downed {}", key);}
-                else if let Event::Lagged = event {info!("Lagged");}
-                Ok(())
-            };
-            match res {
-                Ok(_) => continue,
-                Err(s) => info!("\n\n\nMISC SUBSCRIBER ERROR {:?}\n\n", s)
-            }
-        }
-        Ok(())
-    }
-
     async fn print_state(&self) -> Result<()> {
         let head = self.get_head().await?;
         if !head.no_blocks() {
             let head_block = self.get_local_block(head.hash).await?;
             let converted_timestamp: DateTime<Local> = DateTime::from(head_block.timestamp);
-            info!("Current height: {}\nCurrent hash: {:?}\nAt time: {:?}\nMined by: {:?}", head.height, head.hash, converted_timestamp, head_block.miner_name.clone());
+            info!("\n\nCurrent height: {}\nCurrent hash: {:?}\nAt time: {:?}\nMined by: {:?}", head.height, head.hash, converted_timestamp, head_block.miner_name.clone());
         } else {
             info!("\n\nNEW CHAIN\n\n");
         }
@@ -312,7 +238,7 @@ impl BlockChain {
         let mut game = self.game_gen.create_game()?;
         game.rng_init(block.calc_seed(), self.random_config)?;
 
-        for p_pad in block.get_solution().iter() {
+        for p_pad in block.solution.clone().iter() {
             let pad = *p_pad;
             let random_pad = game.rng_pad(pad)?;
 
@@ -331,11 +257,15 @@ impl BlockChain {
         Ok(false)
     }
 
+    fn node(&self) -> Node {
+        Node::new(self.endpoint_id())
+    }
+
     async fn broadcast_block(&self, hash: Hash) -> Result<()> {
-        let message = BlockMessage::NewBlockHead { hash };
+        let message = BlockMessage::NewBlockHead { node: self.node(), hash };
         let encoded = message.encode()?.to_vec();
         // sender.broadcast_neighbors(encoded).await?;
-        match self.sender.broadcast_neighbors(encoded.into()).await {
+        match self.sender.broadcast(encoded.into()).await {
             Ok(_) => Ok(()),
             Err(_) => Err(Error::msg("Broadcast block failed")),
         }
@@ -350,25 +280,21 @@ impl BlockChain {
     }
 
     async fn request_head(&self) -> Result<()> {
-        let message = BlockMessage::RequestBlockHead{};
+        let message = BlockMessage::RequestBlockHead{ node: self.node() };
         let encoded = message.encode()?.to_vec();
-        match self.sender.broadcast_neighbors(encoded.into()).await {
+        match self.sender.broadcast(encoded.into()).await {
             Ok(_) => Ok(()),
             Err(_) => Err(Error::msg("Request head failed")),
         }
     }
 
-    pub async fn start_mine(&self, miner_name: String) -> Result<Block> {
+    pub async fn start_mine(&self) {
         let mut _guard = self.db_lock.lock().await;
         {
             // If any new blocks are made while we're playing, then it will kill the recording session
             let mut new_block_signal = self.new_block_signal.lock().await;
             *new_block_signal = false;
         }
-
-        let head = self.get_head().await?;
-
-        Ok(Block::new(head, miner_name))
     }
 
     pub async fn submit_mine(&self, new_block: Block) -> Result<()> {
@@ -386,7 +312,7 @@ impl BlockChain {
                 self.broadcast_block(new_hash).await?;
                 self.print_state().await?;
             },
-            Err(_) => {info!("New block failed")}
+            Err(_) => {info!("Submitting block failed")}
         }
         Ok(())
     }
@@ -401,10 +327,10 @@ impl BlockChain {
         false
     }
     // these two have _public because we shouldn't use them in this file. because we don't want to acquire locks
-    pub async fn get_head_hash_public(&self) -> Result<String> {
+    pub async fn get_head_public(&self) -> Result<BlockHead> {
         let _guard = self.db_lock.lock().await;
         let head = self.get_head().await?;
-        Ok(head.hash.encode_hex())
+        Ok(head)
     }
 
     pub async fn get_local_block_public(&self, hash: Hash) -> Result<Block> {
@@ -413,10 +339,83 @@ impl BlockChain {
     }
 }
 
+async fn subscribe_loop(
+    bc: BlockChain, mut receiver: GossipReceiver
+) {
+    info!("SUBLOOP: Waiting to connect...");
+    loop {
+        if init_connection(&bc, &mut receiver).await.is_ok() {
+            break;
+        }
+    }
+    info!("SUBLOOP: Connected!");
+
+    while let Some(e) = receiver.next().await {
+        if e.is_err() {info!("SUB_LOOP API ERROR"); continue;}
+        let event = e.unwrap();
+        match process_event(&bc, &mut receiver, event).await {
+            Ok(_) => {},
+            Err(e) => info!("SUB_LOOP ERROR: {}", e.to_string()),
+        }
+    }
+}
+
+async fn init_connection(bc: &BlockChain, receiver: &mut GossipReceiver) -> Result<()> {
+    receiver.joined().await?;
+    {
+        let _guard = bc.db_lock.lock().await;
+        bc.request_head().await?;
+        bc.broadcast_head().await?;
+    }
+    Ok(())
+}
+
+async fn process_event(bc: &BlockChain, receiver: &mut GossipReceiver, event: Event) -> Result<()> {
+    let _guard = bc.db_lock.lock().await;
+    info!("Event received!");
+
+    if let Event::Received(msg) = event {
+        // match msg.scope {
+        //     Neighbors => {} // Only accept direct neighbour messages
+        //     Swarm(_) => {return Err(Error::msg("Bad message scope"));}
+        // }
+        let message = BlockMessage::decode(&msg.content)?;
+        match message {
+            BlockMessage::NewBlockHead { hash, node: _ } => {
+                // info!("Message: New Block Head");
+                let peers: Vec<EndpointId> = receiver.neighbors().into_iter().collect();   
+                bc.new_block(hash, peers).await?;
+                bc.broadcast_head().await?;
+                bc.print_state().await?;
+            },
+            BlockMessage::RequestBlockHead { node: _ } => {
+                // info!("Message: Request Block Head");
+                bc.broadcast_head().await?;
+            }
+        }
+    }
+    else if let Event::NeighborUp(key) = event {info!("Joined {}", key);}
+    else if let Event::NeighborDown(key) = event {info!("Downed {}", key);}
+    else if let Event::Lagged = event {info!("Lagged");};
+    Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Node {
+    endpoint_id: EndpointId,
+    timestamp: DateTime<Utc>,
+}
+
+impl Node {
+    pub fn new(endpoint_id: EndpointId) -> Self {
+        Node {endpoint_id, timestamp: Utc::now() }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 enum BlockMessage {
-    NewBlockHead { hash: Hash },
-    RequestBlockHead { },
+    NewBlockHead { node: Node, hash: Hash },
+    RequestBlockHead { node: Node },
 }
 
 impl BlockMessage {

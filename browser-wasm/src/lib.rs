@@ -1,14 +1,11 @@
 
-use anyhow::{Result, Error};
+use anyhow::Result;
 
-use tracing::{info, level_filters::LevelFilter};
+use tracing::{level_filters::LevelFilter};
 use tracing_subscriber_wasm::MakeConsoleWriter;
 use wasm_bindgen::{JsError, prelude::wasm_bindgen};
-
-use iroh_blobs::Hash;
-
-
-use sm64_blockchain::{BlockChainClient, GamePad};
+use hex::ToHex;
+use sm64_blockchain::{BlockChainClient, GamePad, Block};
 
 #[wasm_bindgen(start)]
 fn start() {
@@ -37,11 +34,29 @@ pub struct GamePadWeb {
 
 #[wasm_bindgen]
 impl GamePadWeb {
-    pub fn new(button: u16, stick_x: i8, stick_y: i8,) -> Result<Self, JsError> {
+    pub fn new(button: u16, stick_x: i8, stick_y: i8) -> Result<Self, JsError> {
         Ok(Self { button, stick_x, stick_y})
     }
 }
 
+#[wasm_bindgen]
+pub struct LightBlock {
+    prev_hash: String,
+    block_height: u128,
+    timestamp: String,
+    miner_name: String,
+}
+
+impl LightBlock {
+    fn from_block(block: Block) -> Self {
+        Self {
+            prev_hash: block.prev_hash.encode_hex(),
+            block_height: block.block_height,
+            timestamp: block.timestamp.to_string(),
+            miner_name: block.miner_name,
+        }
+    }
+}
 /// Blockchain node using Iroh
 #[wasm_bindgen]
 pub struct BlockChainClientWeb {
@@ -91,23 +106,19 @@ impl BlockChainClientWeb {
 
         self.client.submit_mine(seed, solution_pads).await.map_err(to_js_err)
     }
-    // pub async fn get_head_bytes(&self) -> Result<Vec<u8>, JsError> {
-    //     let block = self.client.get_head().await.map_err(to_js_err)?;
-    //     Ok(block.get_solution())
-    // }
 
     pub async fn has_new_block(&self) -> bool {
         self.client.has_new_block().await
     }
 
     pub async fn get_head_hash(&self) -> Result<String, JsError> {
-        let head = self.client.get_head_hash().await.map_err(to_js_err)?;
-        Ok(head)
+        let head_hash = self.client.get_head_hash().await.map_err(to_js_err)?;
+        Ok(head_hash)
     }
 
-    pub async fn get_block_json(&self, hash_str: String) -> Result<String, JsError> {
+    pub async fn get_light_block(&self, hash_str: String) -> Result<LightBlock, JsError> {
         let block = self.client.get_block_from_str(hash_str).await.map_err(to_js_err)?;
-        Ok(serde_json::to_string_pretty(&block).map_err(to_js_err)?)
+        Ok(LightBlock::from_block(block))
     } 
 }
 

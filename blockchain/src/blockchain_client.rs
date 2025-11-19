@@ -1,13 +1,13 @@
 mod blockchain;
 
 use std::str::FromStr;
-
-use blockchain::{Block, BlockChain, Ticket, GamePad};
+pub use blockchain::{Block, GamePad};
+use blockchain::{BlockChain, Ticket};
+use hex::ToHex;
 use iroh_blobs::Hash;
 use iroh_gossip::TopicId;
 use sm64_binds::SM64GameGenerator;
 use crate::DEFAULT_CONFIG;
-use tracing::info;
 
 use anyhow::{Result, Error};
 
@@ -21,6 +21,10 @@ pub struct BlockChainClient {
 
 impl BlockChainClient {
     pub async fn new(rom_bytes: Vec<u8>, miner_name: String, ticket_opt: Option<String>) -> Result<Self> {
+        if miner_name.len() > DEFAULT_CONFIG.max_name_length {
+            return Err(Error::msg("Miner name is too long"));
+        }
+
         let game_gen = SM64GameGenerator::new(rom_bytes)?;
 
         let ticket = match ticket_opt {
@@ -51,9 +55,15 @@ impl BlockChainClient {
     }
 
     pub async fn start_mine(&mut self) -> Result<u32> {
-        let block = self.bc.start_mine(self.miner_name.clone()).await?;
+        self.bc.start_mine().await;
+
+        let head = self.bc.get_head_public().await?;
+        let block = Block::new(head, self.miner_name.clone())?;
+
         let seed = block.calc_seed();
+
         self.mining_block = Some(block);
+
         Ok(seed)
     }
 
@@ -83,16 +93,14 @@ impl BlockChainClient {
     }
 
     pub async fn get_head_hash(&self) -> Result<String> {
-        self.bc.get_head_hash_public().await
-    }
-
-    pub async fn get_block(&self, hash: Hash) -> Result<Block> {
-        self.bc.get_local_block_public(hash).await
+        let head = self.bc.get_head_public().await?;
+        Ok(head.hash.encode_hex())
     }
 
     pub async fn get_block_from_str(&self, hash_str: String) -> Result<Block> {
         let hash = Hash::from_str(&hash_str)?;
-        self.get_block(hash).await
+        let block = self.bc.get_local_block_public(hash).await?;
+        Ok(block)
     }
 
 }

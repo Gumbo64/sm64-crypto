@@ -14,7 +14,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router": "^7.9.4",
-    "sm64-binds-frontend": "^1.0.12",
+    "sm64-binds-frontend": "^1.0.13",
     "sm64-crypto-browser": "file:../browser-wasm/pkg",
     "vite-plugin-wasm": "^3.5.0"
   },

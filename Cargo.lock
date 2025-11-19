@@ -4639,6 +4639,7 @@ dependencies = [
  "anyhow",
  "console_error_panic_hook",
  "getrandom 0.3.4",
+ "hex",
  "iroh-blobs",
  "n0-future 0.1.3",
  "n0-snafu",
