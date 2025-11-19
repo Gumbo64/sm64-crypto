@@ -23,62 +23,13 @@ Progress:
 - [ ] Wallets
 - [ ] Transactions
 
-## Controls
-Keyboard button - N64 Button
-* WASD - Joystick
-* I - A
-* J - B
-* O - Z
-* Space - Start (or interrupt playback after rewinding)
-* Right Shift - R
-
-Special keys
-* R - Rewind back ~10 seconds in the run
-* hold Shift - Change to 10x Speed (or as fast as your computer can go)
-
-## ./main Executable options
-Options:
-*  -m, --mine                     Enable mining
-*  -n, --nowait                   Wait for a connection before starting
-*  -s, --showblocks               
-*  -m, --miner-name <MINER_NAME>  [default: Gumbo64]
-*  -h, --help                     Print help
-
-ie `./main --nowait --mine --miner-name "your name here"`
 
 ## Building
 Before you begin, ensure you have the following:
-- **SM64 z64**: Ensure that you legally obtain a US copy of the game as a z64 file. It should be 8.00MB large
+- **SM64 z64**: Ensure that you legally obtain a US copy of the game as a z64 file. It should be 8.00MB large, and put in the main directory (next to this readme)
 
-### Windows steps
-Make sure that HyperV and Virtualisation are on so that WSL can work. You may have to restart your computer when WSL is installed.
-You may have to install WSL manually if this install script fails.
+### Building
 
-1. download this repository as zip
-2. extract it
-3. Put your sm64 ROM into the root of the extracted folder, and call it `baserom.us.z64`
-4. click and run `windows_install.bat`
-5. do what it says (it will take a while). if you get coloured text after Debian installs then type `exit` and press enter to continue installation.
-  When rust is installing, press enter if you don't have rust or press 3 if you already have rust
-6. after it is done, click `windows_play_game.bat` OR cd into `prod` and run `./main` using your chosen commands
-
-### Linux steps
-1. download this repository as zip
-2. extract it
-3. Put your sm64 ROM into the root of the extracted folder, and call it `baserom.us.z64`
-4. right click and run `install.sh` (or cd into the root of the repository and run it in the terminal)
-5. do what it says (it will take a while)
-  When rust is installing, press enter if you don't have rust or press 3 if you already have rust
-6. after it is done, run `play_game.sh` to play OR cd into `prod` and run `./main` using your chosen commands
-
-<!-- ### Podman Desktop (no GUI or mining)
-1. Put baserom.us.z64 in the root folder (next to readme.md etc)
-2. On podman desktop, go Containers -> Create -> Containerfile or Dockerfile (purple)
-3. Select Containerfile path by navigating to this folder, then selecting Dockerfile
-4. Name it sm64-crypto optionally
-5. Click Build and wait for it to build
-6. Once it's done, go to Images and click the icon next to the sm64-crypto image that looks like a play button
-7. go to the bottom and click Start Container -->
 
 ## Credits
 * Iroh

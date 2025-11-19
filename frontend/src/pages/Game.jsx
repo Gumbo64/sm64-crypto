@@ -43,8 +43,6 @@ function Game() {
 
       // let head_hash = await bc.get_head_hash();
 
-
-
     }
 
 

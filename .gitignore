@@ -1,24 +1,8 @@
-baserom.us.z64
-sm64.us
-sm64_headless.us
-sm64.us.wasm
-sm64_headless.us.wasm
-
-WASM
-
-*.tmp.so
 target/
-__pycache__
 .venv
 .vscode
 build/
 dist/
-tmp_so/
 
-sm64game/sm64env/build
-rust_crypto/sm64_headless.us
-prod
-prod2
+baserom.us.z64
 blockchain_data
-rom
-*.m64

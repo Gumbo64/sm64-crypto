@@ -1,14 +1,6 @@
 # Main Makefile
-ROM_FILE = baserom.us.z64
-
-SM64PC = sm64-port
 RELEASE = target/release
-
 PROD = prod
-WASM = WASM
-WASM_XOR = WASM_XOR
-
-WEB_PROD = frontend/src/scripts/sm64/pkg
 
 RESET  = \033[0m
 RED    = \033[31m
@@ -21,7 +13,8 @@ all: cli-build web-build
 
 
 web-build:
-	wasm-pack build ./browser-wasm --dev --weak-refs --reference-types -t bundler -d pkg
+	cargo install wasm-pack wasm-bindgen-cli
+	cd frontend && npm run build:wasm:release
 
 cli-build:
 	@echo "$(GREEN)\nBUILDING CLI VERSION$(RESET)"
@@ -29,9 +22,6 @@ cli-build:
 
 	mkdir -p $(PROD)
 	cp $(RELEASE)/main $(PROD)/main
-
-	mkdir -p $(PROD)2
-	cp $(RELEASE)/main $(PROD)2/main
 
 clean:
 	@echo "Cleaning up..."

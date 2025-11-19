@@ -8,7 +8,9 @@
     "dev:host": "vite --host",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:wasm": "wasm-pack build ../browser-wasm --dev --weak-refs --reference-types -t bundler -d pkg",
+    "build:wasm:release": "wasm-pack build ../browser-wasm --release -t bundler -d pkg"
   },
   "dependencies": {
     "react": "^19.1.1",

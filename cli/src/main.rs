@@ -17,8 +17,8 @@ struct Args {
     // // When we receive successful blocks, show them to the user
     // #[clap(short, long, default_value_t = false)]
     // showblocks: bool,
-    #[clap(short, long, default_value_t = String::from("Gumbo64"))]
-    name: String,
+    // #[clap(short, long, default_value_t = String::from("Gumbo64"))]
+    // name: String,
     #[clap(short, long, default_value_t = String::from(""))]
     ticket: String,
 }
@@ -42,15 +42,16 @@ async fn main() -> Result<()>{
         false => Some(args.ticket),
     };
 
-    let bc_client = BlockChainClient::new(rom_bytes, args.name, ticket_opt).await.expect("Failed to create blockchain client");
+    let name = String::from("");
+    let bc_client = BlockChainClient::new(rom_bytes, name, ticket_opt).await.expect("Failed to create blockchain client");
 
     info!("Join us at:\n{}\n", bc_client.get_ticket());
 
     loop {
-        time::sleep(time::Duration::from_secs(1)).await;
-        // Check running state if needed
+        time::sleep(time::Duration::from_millis(10)).await;
+
         if !running.load(Ordering::SeqCst) {
-            break; // Exit the loop if running is false
+            break; // Exit the loop if ctrl c
         }
 
         // if args.showblocks && bc_client.has_new_block().await {
