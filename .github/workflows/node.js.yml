@@ -39,7 +39,18 @@ jobs:
           node-version: lts/*
           cache-dependency-path: ./frontend/package-lock.json
           cache: 'npm'
-      - name: Install dependencies
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: wasm-pack wasm-bindgen-cli
+          
+      - name: Build WASM
+        run: npm run build:wasm:release
+      - name: Install NPM dependencies
         run: npm ci
       - name: Build
         run: npm run build
