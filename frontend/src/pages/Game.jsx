@@ -4,22 +4,35 @@ import { sm64_test, sm64_record, getROM, make_config } from "sm64-binds-frontend
 import { GamePadWeb, BlockChainClientWeb } from "sm64-crypto-browser";
 import './Game.css';
 import { GamePad } from "sm64-binds-frontend/src/scripts/sm64/Sm64Game";
+import CopyButton from "../components/CopyButton" 
 
 // Array<GamePad> -> Array<GamePadWeb>
 function map_solution_to_wasm(solution)  {
   return solution.map(e => GamePadWeb.new(e.button, e.stick_x, e.stick_y));
 }
 
+async function init_blockchain() {
+  let rom_bytes = new Uint8Array(await getROM());
+
+  const name = new URLSearchParams(window.location.search).get('name') || prompt("Enter your username:");
+  const ticket = new URLSearchParams(window.location.search).get('ticket') || prompt("Enter your ticket (or otherwise empty)");
+  let bc = await BlockChainClientWeb.new(rom_bytes, name, ticket);
+  return bc;
+}
 
 function Game() {
+  const [my_invite, setTicket] = useState("None");
+  
   const canvasRef = useRef(null);
   async function startGame() {
+    let bc = await init_blockchain();
     let rng_config = make_config(64, 10*(60*30), 100, 5, 0.5, 0.5, 0.2);
-    let rom_bytes = new Uint8Array(await getROM());
-    const name = new URLSearchParams(window.location.search).get('name') || prompt("Enter your username:");
-    const ticket = new URLSearchParams(window.location.search).get('ticket') || prompt("Enter your ticket");
-
-    let bc = await BlockChainClientWeb.new(rom_bytes, name, ticket);
+    
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.set("ticket", await bc.get_ticket());
+    setTicket(url);
+    
     console.log("---------------------INITIALISED\n\n");
 
     async function kill_signal() {
@@ -128,6 +141,7 @@ function Game() {
           </tbody>
         </table>
       </div>
+      {my_invite && <CopyButton copyText={my_invite}>Copy Invite Link</CopyButton>}
       <div id="container">
         <canvas ref={canvasRef} className="emscripten" id="canvas"></canvas>
       </div>
