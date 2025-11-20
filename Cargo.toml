@@ -1,5 +1,6 @@
 [workspace]
 members = ["blockchain", "cli"]
+exclude = ["browser-wasm"]
 
 resolver="3"
 
