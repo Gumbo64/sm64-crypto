@@ -19,7 +19,6 @@ tracing-subscriber-wasm = "0.1.0"
 wasm-bindgen = "=0.2.104"
 wasm-bindgen-futures = "0.4"
 wasm-streams = "0.4.2"
-iroh-blobs =  { workspace = true }
 n0-snafu = "0.2.1"
 anyhow = "1.0.100"
 
