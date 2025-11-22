@@ -1,71 +1,10 @@
 import { useEffect } from "react";
-import { useRef, useState } from "react";
-import { sm64_test, sm64_record, getROM, make_config } from "sm64-binds-frontend";
-import { GamePadWeb, BlockChainClientWeb } from "sm64-crypto-browser";
+import { useRef, useState, useContext } from "react";
+
 import './Game.css';
-import { GamePad } from "sm64-binds-frontend/src/scripts/sm64/Sm64Game";
-import CopyButton from "../components/CopyButton" 
+import MiningWindow from "../components/MiningWindow";
 
-// Array<GamePad> -> Array<GamePadWeb>
-function map_solution_to_wasm(solution)  {
-  return solution.map(e => GamePadWeb.new(e.button, e.stick_x, e.stick_y));
-}
-
-async function init_blockchain() {
-  let rom_bytes = new Uint8Array(await getROM());
-
-  const name = new URLSearchParams(window.location.search).get('name') || prompt("Enter your username:");
-  const ticket = new URLSearchParams(window.location.search).get('ticket') || prompt("Enter your ticket (or otherwise empty)");
-  let bc = await BlockChainClientWeb.new(rom_bytes, name, ticket);
-  return bc;
-}
-
-function Game() {
-  const [my_invite, setTicket] = useState("None");
-  
-  const canvasRef = useRef(null);
-  async function startGame() {
-    let bc = await init_blockchain();
-    let rng_config = make_config(64, 10*(60*30), 100, 5, 0.5, 0.5, 0.2);
-    
-    const url = new URL(window.location.href);
-    url.search = '';
-    url.searchParams.set("ticket", await bc.get_ticket());
-    setTicket(url);
-    
-    console.log("---------------------INITIALISED\n\n");
-
-    async function kill_signal() {
-      return await bc.has_new_block();
-    }
-
-    while (true) {
-      console.log("------------------ started mine\n\n");
-      let seed = await bc.start_mine();
-
-      
-      let solution;
-      try {
-        solution = await sm64_record(canvasRef.current, seed, rng_config, kill_signal);
-      } catch (error) {
-        console.log("New block found, restarting game")
-        continue;
-      }
-      solution = map_solution_to_wasm(solution);
-      await bc.submit_mine(seed, solution);
-
-      // let head_hash = await bc.get_head_hash();
-
-    }
-
-
-    // sm64_test(canvasRef.current);
-
-  }
-
-  useEffect(() => {
-    startGame();
-  }, []);
+function Game() {  
 
   return (
     <>
@@ -141,10 +80,7 @@ function Game() {
           </tbody>
         </table>
       </div>
-      {my_invite && <CopyButton copyText={my_invite}>Copy Invite Link</CopyButton>}
-      <div id="container">
-        <canvas ref={canvasRef} className="emscripten" id="canvas"></canvas>
-      </div>
+      <MiningWindow/>
     </>
   );
 }
