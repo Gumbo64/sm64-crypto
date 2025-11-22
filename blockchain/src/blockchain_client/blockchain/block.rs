@@ -6,8 +6,8 @@ use sha2::{Sha256, Digest};
 use iroh_blobs::Hash;
 use chrono::{DateTime, Utc};
 
-use crate::DEFAULT_CONFIG;
-use sm64_binds::GamePad;
+use crate::CHAIN_CFG;
+use sm64_binds::{GamePad, RngConfig};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Block {
@@ -21,7 +21,7 @@ pub struct Block {
 
 impl Block {
     pub fn new(block_head: BlockHead, miner_name: String) -> Result<Self> {
-        if miner_name.len() > DEFAULT_CONFIG.max_name_length {
+        if miner_name.len() > CHAIN_CFG.max_name_length {
             return Err(Error::msg("Miner name is too long"));
         }
 
@@ -31,8 +31,9 @@ impl Block {
         let timestamp = Utc::now();
         Ok(Block {prev_hash, block_height, timestamp, miner_name, solution:Vec::new()})
     }
+    
     pub fn seal(&mut self, solution_vec: Vec<GamePad>) -> Result<()> {
-        if solution_vec.len() > DEFAULT_CONFIG.max_solution_time {
+        if solution_vec.len() > CHAIN_CFG.max_solution_time {
             return Err(Error::msg("Solution is too long"));
         }
         self.solution = solution_vec;
@@ -61,16 +62,21 @@ impl Block {
         u32::from_be_bytes(hash_bytes.try_into().expect("slice with incorrect length"))
     }
 
+    pub fn calc_rng_config(&self) -> RngConfig {
+        // might be calculated later using block difficulty etc
+        return RngConfig::default();
+    }
+
     pub fn encode(&self) -> Result<Bytes> {
         Ok(postcard::to_stdvec(&self)?.into())
     }
 
     pub fn decode(bytes: &[u8]) -> Result<Block> {
         let block: Block = postcard::from_bytes(bytes)?;
-        if block.miner_name.len() > DEFAULT_CONFIG.max_name_length {
+        if block.miner_name.len() > CHAIN_CFG.max_name_length {
             return Err(Error::msg("Miner name is too long"));
         };
-        if block.solution.len() > DEFAULT_CONFIG.max_solution_time {
+        if block.solution.len() > CHAIN_CFG.max_solution_time {
             return Err(Error::msg("Solution is too long"));
         }
         Ok(block)

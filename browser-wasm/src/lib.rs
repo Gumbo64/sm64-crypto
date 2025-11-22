@@ -5,7 +5,7 @@ use tracing::{level_filters::LevelFilter};
 use tracing_subscriber_wasm::MakeConsoleWriter;
 use wasm_bindgen::{JsError, prelude::wasm_bindgen};
 use hex::ToHex;
-use sm64_blockchain::{BlockChainClient, GamePad, Block};
+use sm64_blockchain::{BlockChainClient, GamePad, Block, RngConfig, CHAIN_CFG};
 
 #[wasm_bindgen(start)]
 fn start() {
@@ -38,6 +38,27 @@ impl GamePadWeb {
         Ok(Self { button, stick_x, stick_y})
     }
 }
+
+#[wasm_bindgen]
+pub struct RngAndSeedWeb(RngConfig, u32);
+#[wasm_bindgen]
+impl RngAndSeedWeb {
+    #[wasm_bindgen(getter)]
+    pub fn seed(&self) -> u32 {self.1}
+    #[wasm_bindgen(getter)]
+    pub fn window_length(&self) -> u32 {self.0.window_length}
+    #[wasm_bindgen(getter)]
+    pub fn random_amount(&self) -> u32 {self.0.random_amount}
+    #[wasm_bindgen(getter)]
+    pub fn random_burst_length(&self) -> u32 {self.0.random_burst_length}
+    #[wasm_bindgen(getter)]
+    pub fn a_prob(&self) -> f32 {self.0.a_prob}
+    #[wasm_bindgen(getter)]
+    pub fn b_prob(&self) -> f32 {self.0.b_prob}
+    #[wasm_bindgen(getter)]
+    pub fn z_prob(&self) -> f32 {self.0.z_prob}
+}
+
 
 #[wasm_bindgen]
 pub struct LightBlock {
@@ -82,8 +103,9 @@ impl BlockChainClientWeb {
         Ok(self.client.get_ticket())
     }
 
-    pub async fn start_mine(&mut self) -> Result<u32, JsError> {
-        self.client.start_mine().await.map_err(to_js_err)
+    pub async fn start_mine(&mut self) -> Result<RngAndSeedWeb, JsError> {
+        let (seed, rng_config) = self.client.start_mine().await.map_err(to_js_err)?;
+        Ok(RngAndSeedWeb(rng_config, seed))
     }
 
     pub async fn submit_mine(&mut self, seed: u32, solution: Vec<GamePadWeb>) -> Result<(), JsError> {
@@ -119,7 +141,15 @@ impl BlockChainClientWeb {
     pub async fn get_light_block(&self, hash_str: String) -> Result<LightBlock, JsError> {
         let block = self.client.get_block_from_str(hash_str).await.map_err(to_js_err)?;
         Ok(LightBlock::from_block(block))
-    } 
+    }
+
+    pub fn get_max_name_length() -> usize {
+        CHAIN_CFG.max_name_length
+    }
+    pub fn get_max_solution_time() -> usize {
+        CHAIN_CFG.max_solution_time
+    }
+
 }
 
 fn to_js_err(err: impl Into<anyhow::Error>) -> JsError {

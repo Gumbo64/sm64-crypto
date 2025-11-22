@@ -6,8 +6,8 @@ use blockchain::{BlockChain, Ticket};
 use hex::ToHex;
 use iroh_blobs::Hash;
 use iroh_gossip::TopicId;
-use sm64_binds::SM64GameGenerator;
-use crate::DEFAULT_CONFIG;
+use sm64_binds::{RngConfig, SM64GameGenerator};
+use crate::CHAIN_CFG;
 
 use anyhow::{Result, Error};
 
@@ -21,7 +21,7 @@ pub struct BlockChainClient {
 
 impl BlockChainClient {
     pub async fn new(rom_bytes: Vec<u8>, miner_name: String, ticket_opt: Option<String>) -> Result<Self> {
-        if miner_name.len() > DEFAULT_CONFIG.max_name_length {
+        if miner_name.len() > CHAIN_CFG.max_name_length {
             return Err(Error::msg("Miner name is too long"));
         }
 
@@ -54,17 +54,18 @@ impl BlockChainClient {
         ticket.serialize()
     }
 
-    pub async fn start_mine(&mut self) -> Result<u32> {
+    pub async fn start_mine(&mut self) -> Result<(u32, RngConfig)> {
         self.bc.start_mine().await;
 
         let head = self.bc.get_head_public().await?;
         let block = Block::new(head, self.miner_name.clone())?;
 
         let seed = block.calc_seed();
+        let cfg = block.calc_rng_config();
 
         self.mining_block = Some(block);
 
-        Ok(seed)
+        Ok((seed, cfg))
     }
 
     pub async fn submit_mine(&mut self, seed: u32, solution: Vec<GamePad>) -> Result<()> {

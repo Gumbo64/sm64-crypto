@@ -26,7 +26,7 @@ use tracing::info;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-pub use sm64_binds::{GamePad, RandomConfig, SM64GameGenerator};
+pub use sm64_binds::{GamePad, SM64GameGenerator};
 
 mod block;
 mod ticket;
@@ -35,10 +35,9 @@ pub use block::{BlockHead, Block};
 pub use ticket::Ticket;
 
 
-
 #[derive(Debug)]
 pub struct BlockChain {
-    router: Router, downloader: Downloader, blobs: BlobsProtocol, tags: Tags, sender: GossipSender, game_gen: SM64GameGenerator, random_config: RandomConfig,
+    router: Router, downloader: Downloader, blobs: BlobsProtocol, tags: Tags, sender: GossipSender, game_gen: SM64GameGenerator,
     db_lock: Arc<Mutex<()>>, new_block_signal: Arc<Mutex<bool>>,
 }
 impl Clone for BlockChain {
@@ -50,7 +49,6 @@ impl Clone for BlockChain {
             tags: self.tags.clone(),
             sender: self.sender.clone(),
             game_gen: self.game_gen.clone(),
-            random_config: self.random_config.clone(),
             db_lock: Arc::clone(&self.db_lock), // We need to make sure it uses this function not just .clone()
             new_block_signal: Arc::clone(&self.new_block_signal),
         }
@@ -77,13 +75,12 @@ impl BlockChain {
 
         let db_lock = Arc::new(Mutex::new(()));
         let new_block_signal = Arc::new(Mutex::new(false));
-        let random_config = RandomConfig::default();
 
         let topic_id = ticket.topic_id;
         let bootstrap = ticket.bootstrap.iter().cloned().collect();
         let (sender, receiver) = gossip.subscribe(topic_id, bootstrap).await?.split();
 
-        let bc = BlockChain {router, downloader, blobs, tags, sender, game_gen, random_config, db_lock, new_block_signal};
+        let bc = BlockChain {router, downloader, blobs, tags, sender, game_gen, db_lock, new_block_signal};
         let bc2 = bc.clone();
 
         task::spawn(subscribe_loop(bc2, receiver));
@@ -236,7 +233,9 @@ impl BlockChain {
 
     async fn evaluate_replay(&self, block: &Block) -> Result<bool> {
         let mut game = self.game_gen.create_game()?;
-        game.rng_init(block.calc_seed(), self.random_config)?;
+
+        game.set_rng_seed(block.calc_seed())?;
+        game.set_rng_config(block.calc_rng_config())?;
 
         for p_pad in block.solution.clone().iter() {
             let pad = *p_pad;

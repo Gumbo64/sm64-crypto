@@ -1,20 +1,16 @@
 import React, { useEffect, useRef, useContext } from 'react';
 
-import { GamePadWeb } from "sm64-crypto-browser";
-import { make_config } from "sm64-binds-frontend";
+import { BlockChainClientWeb, GamePadWeb } from "sm64-crypto-browser";
+import { GameConfig, RngConfig } from "sm64-binds-frontend";
 import { BlockchainContext } from '../context/BlockchainContext';
 import { sm64_record } from "sm64-binds-frontend";
-
-function init_config() {
-    return make_config(64, 10*(60*30), 100, 5, 0.5, 0.5, 0.2);
-}
 
 // Array<GamePad> -> Array<GamePadWeb>
 function map_solution_to_wasm(solution)  {
     return solution.map(e => GamePadWeb.new(e.button, e.stick_x, e.stick_y));
 }
 
-async function startMining(canvasRef, blockchain, rng_config, total_kill_signal = () => {false}) {
+async function startMining(canvasRef, blockchain, total_kill_signal = () => {false}) {
     console.log("---------------------INITIALISED\n\n");
     let isMining = true;
 
@@ -31,12 +27,18 @@ async function startMining(canvasRef, blockchain, rng_config, total_kill_signal 
         return false;
     }
 
+    let max_solution_time = BlockChainClientWeb.get_max_solution_time();
+
     while (isMining) {
         console.log("------------------ started mine\n\n");
-        let seed = await blockchain.start_mine();
+        let rng_and_seed = await blockchain.start_mine();
+        let seed = rng_and_seed.seed;
+
+        let game_config = new GameConfig(max_solution_time, rng_and_seed);
+
         let solution;
         try {
-            solution = await sm64_record(canvasRef.current, seed, rng_config, kill_signal);
+            solution = await sm64_record(canvasRef.current, seed, game_config, kill_signal);
         } catch (error) {
             continue;
         }
@@ -54,8 +56,6 @@ function MiningWindow() {
         if (blockchain) {
             const initialUrl = window.location.href;
 
-            let rngConfig = init_config();
-
             function endMining() {
                 if (window.location.href !== initialUrl) {
                     console.log("Left the mining page, closing mining window")
@@ -64,7 +64,7 @@ function MiningWindow() {
                 return false;
             }
 
-            startMining(canvasRef, blockchain, rngConfig, endMining);
+            startMining(canvasRef, blockchain, endMining);
         }
     }, [blockchain]);
 
