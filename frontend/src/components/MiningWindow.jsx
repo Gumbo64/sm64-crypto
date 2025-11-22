@@ -7,7 +7,7 @@ import { sm64_record } from "sm64-binds-frontend";
 
 // Array<GamePad> -> Array<GamePadWeb>
 function map_solution_to_wasm(solution)  {
-    return solution.map(e => GamePadWeb.new(e.button, e.stick_x, e.stick_y));
+    return solution.map(e => new GamePadWeb(e.button, e.stick_x, e.stick_y));
 }
 
 async function startMining(canvasRef, blockchain, total_kill_signal = () => {false}) {

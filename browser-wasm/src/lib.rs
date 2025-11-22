@@ -26,16 +26,12 @@ fn start() {
 }
 
 #[wasm_bindgen]
-pub struct GamePadWeb {
-    button: u16,
-    stick_x: i8,
-    stick_y: i8,
-}
-
+pub struct GamePadWeb(GamePad);
 #[wasm_bindgen]
 impl GamePadWeb {
-    pub fn new(button: u16, stick_x: i8, stick_y: i8) -> Result<Self, JsError> {
-        Ok(Self { button, stick_x, stick_y})
+    #[wasm_bindgen(constructor)]
+    pub fn new(button: u16, stick_x: i8, stick_y: i8) -> Self {
+        Self(GamePad::new(button, stick_x, stick_y))
     }
 }
 
@@ -61,28 +57,28 @@ impl RngAndSeedWeb {
 
 
 #[wasm_bindgen]
-pub struct LightBlock {
-    prev_hash: String,
-    block_height: u128,
-    timestamp: String,
-    miner_name: String,
-}
+pub struct BlockWeb(Block);
 
-impl LightBlock {
-    fn from_block(block: Block) -> Self {
-        Self {
-            prev_hash: block.prev_hash.encode_hex(),
-            block_height: block.block_height,
-            timestamp: block.timestamp.to_string(),
-            miner_name: block.miner_name,
-        }
+#[wasm_bindgen]
+impl BlockWeb {
+    #[wasm_bindgen(getter)]
+    pub fn prev_hash(&self) -> String {self.0.prev_hash.encode_hex()}
+    #[wasm_bindgen(getter)]
+    pub fn block_height(&self) -> u128 {self.0.block_height}
+    #[wasm_bindgen(getter)]
+    pub fn timestamp(&self) -> String {self.0.timestamp.to_string()}
+    #[wasm_bindgen(getter)]
+    pub fn miner_name(&self) -> String {self.0.miner_name.clone()}
+    #[wasm_bindgen(getter)]
+    pub fn solution(&self) -> Vec<GamePadWeb> {
+        self.0.solution.clone().into_iter()
+            .map(|pad| GamePadWeb(pad))
+            .collect()
     }
 }
 /// Blockchain node using Iroh
 #[wasm_bindgen]
-pub struct BlockChainClientWeb {
-    client: BlockChainClient
-}
+pub struct BlockChainClientWeb(BlockChainClient);
 
 #[wasm_bindgen]
 impl BlockChainClientWeb {
@@ -96,15 +92,15 @@ impl BlockChainClientWeb {
             .await
             .map_err(to_js_err)?;
 
-        Ok(Self {client})
+        Ok(Self(client))
     }
 
     pub fn get_ticket(&self) -> Result<String, JsError> {
-        Ok(self.client.get_ticket())
+        Ok(self.0.get_ticket())
     }
 
     pub async fn start_mine(&mut self) -> Result<RngAndSeedWeb, JsError> {
-        let (seed, rng_config) = self.client.start_mine().await.map_err(to_js_err)?;
+        let (seed, rng_config) = self.0.start_mine().await.map_err(to_js_err)?;
         Ok(RngAndSeedWeb(rng_config, seed))
     }
 
@@ -122,25 +118,24 @@ impl BlockChainClientWeb {
 
         let mut solution_pads: Vec<GamePad> = Vec::new();
         for webpad in solution {
-            let pad = GamePad::new(webpad.button, webpad.stick_x, webpad.stick_y);
-            solution_pads.push(pad);
+            solution_pads.push(webpad.0);
         }
 
-        self.client.submit_mine(seed, solution_pads).await.map_err(to_js_err)
+        self.0.submit_mine(seed, solution_pads).await.map_err(to_js_err)
     }
 
     pub async fn has_new_block(&self) -> bool {
-        self.client.has_new_block().await
+        self.0.has_new_block().await
     }
 
     pub async fn get_head_hash(&self) -> Result<String, JsError> {
-        let head_hash = self.client.get_head_hash().await.map_err(to_js_err)?;
+        let head_hash = self.0.get_head_hash().await.map_err(to_js_err)?;
         Ok(head_hash)
     }
 
-    pub async fn get_light_block(&self, hash_str: String) -> Result<LightBlock, JsError> {
-        let block = self.client.get_block_from_str(hash_str).await.map_err(to_js_err)?;
-        Ok(LightBlock::from_block(block))
+    pub async fn get_light_block(&self, hash_str: String) -> Result<BlockWeb, JsError> {
+        let block = self.0.get_block_from_str(hash_str).await.map_err(to_js_err)?;
+        Ok(BlockWeb(block))
     }
 
     pub fn get_max_name_length() -> usize {
