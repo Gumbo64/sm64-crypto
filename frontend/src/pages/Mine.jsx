@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { useRef, useState, useContext } from "react";
 
-import './Game.css';
+import './Mine.css';
 import MiningWindow from "../components/MiningWindow";
 
-function Game() {  
+function Mine() {  
 
   return (
     <>
@@ -67,7 +67,7 @@ function Game() {
               <td>Dpad Up</td>
               <td>R</td>
               <td>Dpad Up</td>
-              <td>Restart Game (and play back your inputs)</td>
+              <td>Restart Mine (and play back your inputs)</td>
             </tr>
             <tr>
               <td>Dpad Down (hold)</td>
@@ -83,4 +83,4 @@ function Game() {
   );
 }
 
-export default Game;
+export default Mine;

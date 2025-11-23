@@ -1,7 +1,7 @@
 // App.js
 import { BrowserRouter, Routes, Route } from "react-router";
 import React, { useState, useRef, useContext } from 'react';
-import Game from "./pages/Game";
+import Mine from "./pages/Mine";
 import "./App.css";
 import { FileUpload } from "sm64-binds-frontend";
 import AppNavbar from "./components/AppNavbar";
@@ -32,7 +32,7 @@ const MainContent = () => {
     <main>
       <Routes>
         <Route path="/sm64-crypto/" element={<Home />} />
-        <Route path="/sm64-crypto/game" element={<Game />} />
+        <Route path="/sm64-crypto/mine" element={<Mine />} />
         <Route path="/sm64-crypto/explorer" element={<Explorer />} />
       </Routes>
     </main>

@@ -1,5 +1,7 @@
 use clap::Parser;
 
+use std::fs::File;
+use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc};
 use tokio::time;
@@ -45,7 +47,10 @@ async fn main() -> Result<()>{
     let name = String::from("");
     let bc_client = BlockChainClient::new(rom_bytes, name, ticket_opt).await.expect("Failed to create blockchain client");
 
-    info!("Join us at:\n{}\n", bc_client.get_ticket());
+
+    let ticket_str = bc_client.get_ticket();
+    info!("Join us at:\n{}\n", ticket_str);
+    write_ticket_to_file(&ticket_str)?;
 
     loop {
         time::sleep(time::Duration::from_millis(10)).await;
@@ -53,12 +58,14 @@ async fn main() -> Result<()>{
         if !running.load(Ordering::SeqCst) {
             break; // Exit the loop if ctrl c
         }
-
-        // if args.showblocks && bc_client.has_new_block().await {
-        //     let _ = show_head(&bc_client).await;
-        // }
     }
 
     info!("Ending the program");
+    Ok(())
+}
+
+fn write_ticket_to_file(ticket: &str) -> io::Result<()> {
+    let mut file = File::create("./ticket.txt")?; // Create or truncate the file
+    file.write_all(ticket.as_bytes())?; // Write the ticket as bytes
     Ok(())
 }

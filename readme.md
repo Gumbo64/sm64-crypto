@@ -1,7 +1,8 @@
-# SM64 Crypto
+# SM64 Blockchain
 ## Summary
-Creating an independent cryptocurrency gained exclusively by playing Mario 64. 
-Since gameplay *directly* seals blocks, it has many unique properties: 
+
+Eventually creating an independent cryptocurrency gained exclusively by playing Mario 64. 
+Since gameplay *directly* seals blocks, it would have many unique properties: 
 * No need for the initial investments, PVP or gas fees that required for other play-to-earn cryptos require
 * Only mined by humans at the moment, otherwise it could be an open-invite benchmark for AI
 * Produces a usable dataset of gameplay as the blockchain grows.
@@ -19,16 +20,31 @@ Progress:
 - [x] P2P Networking, broadcasting blocks
 - [x] Consensus and syncing
 - [x] Calculating random seeds and random input generation
-- [ ] Browser Version
+- [x] Browser Version
 - [ ] Wallets
 - [ ] Transactions
 
 
 ## Building
 Before you begin, ensure you have the following:
-- **SM64 z64**: Ensure that you legally obtain a US copy of the game as a z64 file. It should be 8.00MB large, and put in the main directory (next to this readme)
+- **SM64 ROM**: Ensure that you legally obtain a US copy of the game as a z64 file. It should be 8.00MB large, and put in the main directory (next to this readme)
 
-### Building
+### Native node
+1. install cargo https://doc.rust-lang.org/cargo/getting-started/installation.html
+2. Simply run `cargo run` in the root directory, or `cargo run -- -t <ticket>` if you're providing a ticket
+
+### Web version
+Get the ROM and then go to this link
+https://gumbo64.github.io/sm64-crypto/
+
+### Running your own web version
+The webserver provides a static page (same as the link provided above), so you don't really need to do this unless you're modding (have fun!)
+1. install cargo https://doc.rust-lang.org/cargo/getting-started/installation.html
+2. run `cargo install wasm-pack wasm-bindgen-cli`
+2. `cd frontend`
+3. `npm run build:wasm:release`
+4. `npm run dev`
+5. click the link in the terminal
 
 
 ## Credits
