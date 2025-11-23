@@ -16,7 +16,7 @@ use iroh_blobs::{api::{ downloader::{Downloader, Shuffled}, tags::Tags }, BlobsP
 use iroh::{Endpoint, EndpointId };
 use iroh_gossip::{
     api::{Event, GossipReceiver, GossipSender}, net::Gossip,
-    // proto::DeliveryScope::{Neighbors, Swarm}
+    proto::DeliveryScope::{Neighbors, Swarm}
 };
 
 use iroh::protocol::Router;
@@ -264,7 +264,7 @@ impl BlockChain {
         let message = BlockMessage::NewBlockHead { node: self.node(), hash };
         let encoded = message.encode()?.to_vec();
         // sender.broadcast_neighbors(encoded).await?;
-        match self.sender.broadcast(encoded.into()).await {
+        match self.sender.broadcast_neighbors(encoded.into()).await {
             Ok(_) => Ok(()),
             Err(_) => Err(Error::msg("Broadcast block failed")),
         }
@@ -281,7 +281,7 @@ impl BlockChain {
     async fn request_head(&self) -> Result<()> {
         let message = BlockMessage::RequestBlockHead{ node: self.node() };
         let encoded = message.encode()?.to_vec();
-        match self.sender.broadcast(encoded.into()).await {
+        match self.sender.broadcast_neighbors(encoded.into()).await {
             Ok(_) => Ok(()),
             Err(_) => Err(Error::msg("Request head failed")),
         }
@@ -374,10 +374,10 @@ async fn process_event(bc: &BlockChain, receiver: &mut GossipReceiver, event: Ev
     info!("Event received!");
 
     if let Event::Received(msg) = event {
-        // match msg.scope {
-        //     Neighbors => {} // Only accept direct neighbour messages
-        //     Swarm(_) => {return Err(Error::msg("Bad message scope"));}
-        // }
+        match msg.scope {
+            Neighbors => {} // Only accept direct neighbour messages
+            Swarm(_) => {return Err(Error::msg("Bad message scope"));}
+        }
         let message = BlockMessage::decode(&msg.content)?;
         match message {
             BlockMessage::NewBlockHead { hash, node: _ } => {

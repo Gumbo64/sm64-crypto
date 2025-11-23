@@ -7,6 +7,8 @@ import { FileUpload } from "sm64-binds-frontend";
 import AppNavbar from "./components/AppNavbar";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { BlockchainProvider, BlockchainContext } from './context/BlockchainContext';
+import Explorer from "./pages/Explorer";
+import Home from "./pages/Home";
 
 function App() {
   return (
@@ -29,7 +31,9 @@ const MainContent = () => {
   return (
     <main>
       <Routes>
-        <Route path="/sm64-crypto" element={<Game />} />
+        <Route path="/sm64-crypto/" element={<Home />} />
+        <Route path="/sm64-crypto/game" element={<Game />} />
+        <Route path="/sm64-crypto/explorer" element={<Explorer />} />
       </Routes>
     </main>
   );

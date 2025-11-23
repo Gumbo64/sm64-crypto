@@ -10,9 +10,8 @@ const AppNavbar = () => {
 			<Navbar.Toggle aria-controls="basic-navbar-nav" />
 			<Navbar.Collapse id="basic-navbar-nav">
 				<Nav className="ml-auto">
-				<Nav.Link as={Link} to="/sm64-crypto">Mine</Nav.Link>
-				<Nav.Link as={Link} to="/link2">Link 2</Nav.Link>
-				<Nav.Link as={Link} to="/link3">Link 3</Nav.Link>
+				<Nav.Link as={Link} to="/sm64-crypto/game">Game</Nav.Link>
+				<Nav.Link as={Link} to="/sm64-crypto/explorer">Explorer</Nav.Link>
 				<InviteButton/>
 				</Nav>
 			</Navbar.Collapse>

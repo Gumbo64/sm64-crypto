@@ -33,6 +33,12 @@ impl GamePadWeb {
     pub fn new(button: u16, stick_x: i8, stick_y: i8) -> Self {
         Self(GamePad::new(button, stick_x, stick_y))
     }
+    #[wasm_bindgen(getter)]
+    pub fn button(&self) -> u16 {self.0.button}
+    #[wasm_bindgen(getter)]
+    pub fn stick_x(&self) -> i8 {self.0.stick_x}
+    #[wasm_bindgen(getter)]
+    pub fn stick_y(&self) -> i8 {self.0.stick_y}
 }
 
 #[wasm_bindgen]
@@ -74,6 +80,11 @@ impl BlockWeb {
         self.0.solution.clone().into_iter()
             .map(|pad| GamePadWeb(pad))
             .collect()
+    }
+    pub fn calc_rng_and_seed(&self) -> RngAndSeedWeb {
+        let rng_config = self.0.calc_rng_config();
+        let seed = self.0.calc_seed();
+        RngAndSeedWeb(rng_config, seed)
     }
 }
 /// Blockchain node using Iroh
@@ -133,7 +144,7 @@ impl BlockChainClientWeb {
         Ok(head_hash)
     }
 
-    pub async fn get_light_block(&self, hash_str: String) -> Result<BlockWeb, JsError> {
+    pub async fn get_block(&self, hash_str: String) -> Result<BlockWeb, JsError> {
         let block = self.0.get_block_from_str(hash_str).await.map_err(to_js_err)?;
         Ok(BlockWeb(block))
     }

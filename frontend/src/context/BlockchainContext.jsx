@@ -23,7 +23,8 @@ const BlockchainProvider = ({ children }) => {
 			const ticket = new URLSearchParams(window.location.search).get('ticket') || prompt("Enter your ticket (or otherwise empty)");
 			init_blockchain(name, ticket);
 		}
-	}, [hasRom]);
+
+	}, [hasRom, blockchain]);
 
 	return (
 		<BlockchainContext.Provider value={{ hasRom, setHasRom, blockchain, init_blockchain }}>

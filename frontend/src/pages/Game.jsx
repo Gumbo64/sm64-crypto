@@ -8,13 +8,11 @@ function Game() {
 
   return (
     <>
-      <div className="container text-light" id="controls">
+      <div className="container" id="controls">
         <figure>
-          <blockquote className="blockquote">
-            <h1 className="display-6"><strong>Keyboard Controls</strong></h1>
-          </blockquote>
+          <h1><strong>Controls</strong></h1>
           <figcaption className="blockquote-footer">
-            You can use a controller!
+            You can use a controller! (xinput/xbox etc)
           </figcaption>
           {/*<figcaption className="blockquote-footer"> You can save! Save is stored in local storage. </figcaption>*/}
           <figcaption className="blockquote-footer">
